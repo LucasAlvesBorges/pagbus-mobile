@@ -1,5 +1,7 @@
 import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse, AxiosError } from 'axios';
 import * as SecureStore from 'expo-secure-store';
+import Constants from 'expo-constants';
+import { Platform } from 'react-native';
 
 // Configuração de URLs por ambiente
 const ENV_CONFIG = {
@@ -7,6 +9,7 @@ const ENV_CONFIG = {
     // Use uma dessas URLs para desenvolvimento
     LOCAL: 'http://localhost:8000/api/v1',
     NGROK: 'https://a218d5a8f6cf.ngrok-free.app/api/v1',
+    IOS_SIMULATOR: 'http://127.0.0.1:8000/api/v1',
   },
   production: {
     // Adicione a URL de produção aqui quando estiver pronto
@@ -17,9 +20,37 @@ const ENV_CONFIG = {
 // Detectar ambiente
 const isDev = __DEV__;
 
+const resolveExpoHost = (): string | undefined => {
+  const expoGoConfig = Constants?.expoGoConfig;
+  const expoConfig = Constants?.expoConfig;
+  const manifest = (Constants as any)?.manifest;
+
+  return (
+    expoGoConfig?.debuggerHost ||
+    expoGoConfig?.hostUri ||
+    expoConfig?.hostUri ||
+    manifest?.debuggerHost ||
+    manifest?.hostUri
+  );
+};
+
+const resolveIOSDevURL = (): string => {
+  const host = resolveExpoHost()?.split(':').shift();
+
+  if (host) {
+    return `http://${host}:8000/api/v1`;
+  }
+
+  return ENV_CONFIG.development.IOS_SIMULATOR;
+};
+
 // Selecionar URL baseada no ambiente
 const getBaseURL = (): string => {
   if (isDev) {
+    if (Platform.OS === 'ios') {
+      return resolveIOSDevURL();
+    }
+
     // Para desenvolvimento, use NGROK ou LOCAL
     // Mude aqui entre LOCAL e NGROK conforme necessário
     return ENV_CONFIG.development.NGROK;
@@ -38,6 +69,7 @@ if (isDev) {
   console.log('📱 Configuração da API:', {
     Ambiente: 'Development',
     BaseURL: BASE_URL,
+    Plataforma: Platform.OS,
   });
 }
 
@@ -165,4 +197,3 @@ export const apiService = {
 };
 
 export default api;
-

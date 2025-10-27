@@ -1,13 +1,13 @@
-import { useState } from 'react';
-import { StyleSheet, Text, View, TouchableOpacity, ScrollView, Alert } from 'react-native';
-import { StatusBar } from 'expo-status-bar';
 import { useRouter } from 'expo-router';
-import { paymentService, PaymentRequest } from '../../services/paymentService';
+import { StatusBar } from 'expo-status-bar';
+import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+
 import { API_URL } from '../../config/env';
+import { paymentService, PaymentRequest } from '../../services/paymentService';
 
 const TARIFFS = [
-  { id: 1, name: 'Tarifa R$ 4,20', value: 4.20 },
-  { id: 2, name: 'Tarifa R$ 5,00', value: 5.00 },
+  { id: 1, name: 'Tarifa R$ 4,20', value: 4.2 },
+  { id: 2, name: 'Tarifa R$ 5,00', value: 5.0 },
 ];
 
 export default function PaymentScreen() {
@@ -17,8 +17,7 @@ export default function PaymentScreen() {
     try {
       console.log('🌐 URL da API:', API_URL);
       console.log('🗝️ Iniciando geração de pagamento para:', tariff.name);
-      
-      // Preparar dados para a requisição
+
       const paymentData: PaymentRequest = {
         company_id: 1, // TODO: Buscar do contexto/estado global
         items: [
@@ -35,12 +34,10 @@ export default function PaymentScreen() {
 
       console.log('📤 Enviando requisição para API:', paymentData);
 
-      // Chamada REAL à API usando o serviço configurado
       const response = await paymentService.createPayment(paymentData);
-      
+
       console.log('📥 Resposta da API:', response);
 
-      // Extrair dados da resposta
       const qrCodeData = response.transaction.pagamento_url;
       const pixLink = response.redirect_url || response.transaction.pagamento_url;
       const transactionId = response.transaction.id.toString();
@@ -49,21 +46,19 @@ export default function PaymentScreen() {
       console.log('✅ Link PIX:', pixLink);
       console.log('✅ Transaction ID:', transactionId);
 
-      // Navegar para a tela de detalhes do pagamento
       router.push({
         pathname: '/payment-detail',
         params: {
           tariffName: tariff.name,
           tariffValue: tariff.value.toString(),
-          qrCodeData: qrCodeData,
-          pixLink: pixLink,
-          transactionId: transactionId,
+          qrCodeData,
+          pixLink,
+          transactionId,
         },
       });
-
     } catch (error: any) {
       console.error('❌ Erro ao gerar pagamento:', error);
-      
+
       Alert.alert(
         'Erro ao conectar com o servidor',
         error?.message || 'Verifique se o backend está rodando e acessível.'
@@ -74,7 +69,7 @@ export default function PaymentScreen() {
   return (
     <ScrollView style={styles.container}>
       <StatusBar style="dark" />
-      
+
       <View style={styles.content}>
         <Text style={styles.sectionTitle}>Escolha a tarifa</Text>
         <Text style={styles.sectionDescription}>
@@ -107,30 +102,6 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 24,
     paddingTop: 60,
-  },
-  header: {
-    alignItems: 'center',
-    marginBottom: 32,
-  },
-  emoji: {
-    fontSize: 64,
-    marginBottom: 16,
-  },
-  title: {
-    fontSize: 36,
-    fontWeight: 'bold',
-    marginBottom: 8,
-    color: '#1a1a1a',
-  },
-  subtitle: {
-    fontSize: 16,
-    color: '#666',
-    textAlign: 'center',
-  },
-  divider: {
-    height: 1,
-    backgroundColor: '#e0e0e0',
-    marginVertical: 24,
   },
   sectionTitle: {
     fontSize: 24,
@@ -170,23 +141,5 @@ const styles = StyleSheet.create({
     fontSize: 32,
     fontWeight: 'bold',
     color: '#007AFF',
-  },
-  infoBox: {
-    backgroundColor: '#E3F2FD',
-    padding: 20,
-    borderRadius: 12,
-    borderLeftWidth: 4,
-    borderLeftColor: '#007AFF',
-  },
-  infoTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#007AFF',
-    marginBottom: 12,
-  },
-  infoText: {
-    fontSize: 14,
-    color: '#333',
-    lineHeight: 22,
   },
 });

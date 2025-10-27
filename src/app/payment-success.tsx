@@ -9,11 +9,11 @@ export default function PaymentSuccessScreen() {
   const { tariffName, tariffValue, transactionId } = params;
 
   const handleBackToTariffs = () => {
-    router.push('/(tabs)');
+    router.push('/payment');
   };
 
   const handlePayAgain = () => {
-    router.push('/(tabs)');
+    router.push('/payment');
   };
 
   return (
@@ -243,4 +243,3 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 });
-
