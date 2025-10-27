@@ -8,6 +8,13 @@ export default function PaymentSuccessScreen() {
   const params = useLocalSearchParams();
   const { tariffName, tariffValue, transactionId } = params;
 
+  // Formatar valor em reais (BRL)
+  const formatCurrency = (value: string | string[] | undefined): string => {
+    if (!value) return '0,00';
+    const numValue = parseFloat(Array.isArray(value) ? value[0] : value);
+    return numValue.toFixed(2).replace('.', ',');
+  };
+
   const handleBackToTariffs = () => {
     router.push('/payment');
   };
@@ -38,7 +45,7 @@ export default function PaymentSuccessScreen() {
             <Ionicons name="cash-outline" size={24} color="#007AFF" />
             <View style={styles.infoTextContainer}>
               <Text style={styles.infoLabel}>Valor Pago</Text>
-              <Text style={styles.infoValue}>{tariffName}</Text>
+              <Text style={styles.infoValue}>R$ {formatCurrency(tariffValue)}</Text>
             </View>
           </View>
 
@@ -75,16 +82,9 @@ export default function PaymentSuccessScreen() {
             onPress={handleBackToTariffs}
           >
             <Ionicons name="home" size={20} color="#fff" />
-            <Text style={styles.primaryButtonText}>Voltar às Tarifas</Text>
+            <Text style={styles.primaryButtonText}>Voltar</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity
-            style={styles.secondaryButton}
-            onPress={handlePayAgain}
-          >
-            <Ionicons name="add-circle-outline" size={20} color="#007AFF" />
-            <Text style={styles.secondaryButtonText}>Realizar Novo Pagamento</Text>
-          </TouchableOpacity>
         </View>
       </ScrollView>
     </View>
