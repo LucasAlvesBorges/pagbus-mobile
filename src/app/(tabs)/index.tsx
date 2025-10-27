@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { StyleSheet, Text, View, TouchableOpacity, ScrollView, Alert } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import { paymentService, PaymentRequest } from '../../services/paymentService';
 import { API_URL } from '../../config/env';
 
@@ -12,6 +13,15 @@ const TARIFFS = [
 
 export default function PaymentScreen() {
   const router = useRouter();
+  const [quantity, setQuantity] = useState(1);
+
+  const handleIncreaseQuantity = () => {
+    setQuantity(prev => Math.min(prev + 1, 99));
+  };
+
+  const handleDecreaseQuantity = () => {
+    setQuantity(prev => Math.max(prev - 1, 1));
+  };
 
   const handleSelectTariff = async (tariff: typeof TARIFFS[0]) => {
     try {
@@ -19,12 +29,13 @@ export default function PaymentScreen() {
       console.log('🗝️ Iniciando geração de pagamento para:', tariff.name);
       
       // Preparar dados para a requisição
+      const totalAmount = tariff.value * quantity;
       const paymentData: PaymentRequest = {
         company_id: 1, // TODO: Buscar do contexto/estado global
         items: [
           {
-            title: `Passagem - ${tariff.name}`,
-            quantity: 1,
+            title: `${quantity}x ${tariff.name}`,
+            quantity: quantity,
             unit_price: tariff.value,
             currency_id: 'BRL',
           },
@@ -53,8 +64,8 @@ export default function PaymentScreen() {
       router.push({
         pathname: '/payment-detail',
         params: {
-          tariffName: tariff.name,
-          tariffValue: tariff.value.toString(),
+          tariffName: `${quantity}x ${tariff.name}`,
+          tariffValue: totalAmount.toString(),
           qrCodeData: qrCodeData,
           pixLink: pixLink,
           transactionId: transactionId,
@@ -80,6 +91,27 @@ export default function PaymentScreen() {
         <Text style={styles.sectionDescription}>
           Selecione o valor da passagem que deseja pagar
         </Text>
+
+        <View style={styles.quantitySelector}>
+          <Text style={styles.quantityLabel}>Quantidade de passagens</Text>
+          <View style={styles.quantityControls}>
+            <TouchableOpacity 
+              style={styles.quantityButton} 
+              onPress={handleDecreaseQuantity}
+            >
+              <Ionicons name="remove-circle-outline" size={32} color="#007AFF" />
+            </TouchableOpacity>
+            <View style={styles.quantityDisplay}>
+              <Text style={styles.quantityText}>{quantity}</Text>
+            </View>
+            <TouchableOpacity 
+              style={styles.quantityButton} 
+              onPress={handleIncreaseQuantity}
+            >
+              <Ionicons name="add-circle-outline" size={32} color="#007AFF" />
+            </TouchableOpacity>
+          </View>
+        </View>
 
         <View style={styles.tariffContainer}>
           {TARIFFS.map((tariff) => (
@@ -188,5 +220,47 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#333',
     lineHeight: 22,
+  },
+  quantitySelector: {
+    backgroundColor: '#fff',
+    padding: 20,
+    borderRadius: 16,
+    marginBottom: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  quantityLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  quantityControls: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 20,
+  },
+  quantityButton: {
+    padding: 8,
+  },
+  quantityDisplay: {
+    backgroundColor: '#F0F8FF',
+    minWidth: 80,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+    borderWidth: 2,
+    borderColor: '#007AFF',
+  },
+  quantityText: {
+    fontSize: 32,
+    fontWeight: 'bold',
+    color: '#007AFF',
+    textAlign: 'center',
   },
 });
