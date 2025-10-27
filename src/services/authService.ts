@@ -4,6 +4,7 @@ import { apiService } from './api';
 
 const ACCESS_TOKEN_KEY = 'auth_token';
 const REFRESH_TOKEN_KEY = 'refresh_token';
+const USER_ID_KEY = 'user_id';
 
 export interface LoginCredentials {
   username: string;
@@ -13,6 +14,7 @@ export interface LoginCredentials {
 export interface LoginResponse {
   refresh: string;
   access: string;
+  user_id: number;
 }
 
 export interface RegisterPayload {
@@ -30,6 +32,7 @@ class AuthService {
     const response = await apiService.post<LoginResponse>(`${this.baseUrl}/login/`, credentials);
     await SecureStore.setItemAsync(ACCESS_TOKEN_KEY, response.access);
     await SecureStore.setItemAsync(REFRESH_TOKEN_KEY, response.refresh);
+    await SecureStore.setItemAsync(USER_ID_KEY, response.user_id.toString());
     return response;
   }
 
@@ -41,6 +44,7 @@ class AuthService {
     await Promise.all([
       SecureStore.deleteItemAsync(ACCESS_TOKEN_KEY),
       SecureStore.deleteItemAsync(REFRESH_TOKEN_KEY),
+      SecureStore.deleteItemAsync(USER_ID_KEY),
     ]);
   }
 
@@ -50,6 +54,11 @@ class AuthService {
 
   async getStoredRefreshToken() {
     return SecureStore.getItemAsync(REFRESH_TOKEN_KEY);
+  }
+
+  async getStoredUserId(): Promise<number | null> {
+    const userId = await SecureStore.getItemAsync(USER_ID_KEY);
+    return userId ? parseInt(userId, 10) : null;
   }
 }
 

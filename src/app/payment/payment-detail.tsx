@@ -5,12 +5,12 @@ import QRCode from 'react-native-qrcode-svg';
 import { StatusBar } from 'expo-status-bar';
 import Clipboard from '@react-native-clipboard/clipboard';
 import { Ionicons } from '@expo/vector-icons';
-import { paymentService } from '../services/paymentService';
+import { paymentService } from '../../services/paymentService';
 
 export default function PaymentDetailScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
-  const { tariffName, tariffValue, qrCodeData, pixLink, transactionId } = params;
+  const { tariffName, tariffValue, qrCodeData, pixLink, transactionId, busLineId, busLineName, busLineCode, vehiclePrefix } = params;
   const [isCheckingPayment, setIsCheckingPayment] = useState(false);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const hasNavigatedRef = useRef(false);
@@ -50,11 +50,15 @@ export default function PaymentDetailScreen() {
 
         // Navegar para tela de sucesso
         router.replace({
-          pathname: '/payment-success',
+          pathname: '/payment/payment-success',
           params: {
             tariffName,
             tariffValue,
             transactionId: transactionId as string,
+            busLineId,
+            busLineName,
+            busLineCode,
+            vehiclePrefix,
           },
         });
       }

@@ -6,7 +6,7 @@ import { Ionicons } from '@expo/vector-icons';
 export default function PaymentSuccessScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
-  const { tariffName, tariffValue, transactionId } = params;
+  const { tariffName, tariffValue, transactionId, busLineId, busLineName, busLineCode, vehiclePrefix } = params;
 
   // Formatar valor em reais (BRL)
   const formatCurrency = (value: string | string[] | undefined): string => {
@@ -16,11 +16,26 @@ export default function PaymentSuccessScreen() {
   };
 
   const handleBackToTariffs = () => {
-    router.push('/payment');
+    // Se tiver informações de linha e veículo, voltar para tela de tarifas
+    if (busLineId && vehiclePrefix) {
+      router.push({
+        pathname: '/payment',
+        params: {
+          busLineId: busLineId as string,
+          busLineName: busLineName as string,
+          busLineCode: busLineCode as string,
+          vehiclePrefix: vehiclePrefix as string,
+        },
+      });
+    } else {
+      // Caso contrário, voltar para início da seleção
+      router.push('/payment/select-busline');
+    }
   };
 
   const handlePayAgain = () => {
-    router.push('/payment');
+    // Sempre reiniciar do início quando pagar novamente
+    router.push('/payment/select-busline');
   };
 
   return (
@@ -243,3 +258,4 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 });
+

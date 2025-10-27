@@ -17,6 +17,11 @@ export interface PaymentRequest {
   }>;
   external_reference: string;
   front_url: string;
+  // Campos opcionais para histórico
+  bus_line_name?: string;
+  bus_line_id?: string;
+  vehicle_prefix?: string;
+  user_id?: number;
 }
 
 export interface PaymentResponse {

@@ -50,7 +50,7 @@ export default function LoginScreen() {
 
       setMatricula('');
       setPassword('');
-      router.replace('/payment');
+      router.replace('/payment/select-busline');
     } catch (error: any) {
       console.error('Erro ao realizar login:', error);
 
