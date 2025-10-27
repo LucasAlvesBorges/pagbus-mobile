@@ -16,8 +16,8 @@ import { authService } from '../../services/authService';
 
 export default function LoginScreen() {
   const router = useRouter();
-  const [matricula, setMatricula] = useState('');
-  const [password, setPassword] = useState('');
+  const [matricula, setMatricula] = useState('araujo.pagbus');
+  const [password, setPassword] = useState('4705');
   const [errors, setErrors] = useState<{ matricula?: string; password?: string }>({});
   const [loading, setLoading] = useState(false);
 
