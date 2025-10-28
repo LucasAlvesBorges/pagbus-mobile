@@ -20,7 +20,6 @@ export default function PaymentScreen() {
   const [tariffs, setTariffs] = useState<Tariff[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedTariff, setSelectedTariff] = useState<Tariff | null>(null);
-  const [generatingPayment, setGeneratingPayment] = useState(false);
 
   // Redirecionar se não houver linha selecionada
   useEffect(() => {
@@ -85,10 +84,7 @@ export default function PaymentScreen() {
       Alert.alert('Aviso', 'Por favor, selecione uma tarifa.');
       return;
     }
-    
     try {
-      setGeneratingPayment(true); // Ativar spinner do botão
-      
       console.log('🌐 URL da API:', API_URL);
       console.log('🗝️ Iniciando geração de pagamento para:', `Tarifa ${formatCurrencyWithSymbol(selectedTariff.value)}`);
 
@@ -161,8 +157,6 @@ export default function PaymentScreen() {
         'Erro ao conectar com o servidor',
         error?.message || 'Verifique se o backend está rodando e acessível.'
       );
-    } finally {
-      setGeneratingPayment(false); // Desativar spinner do botão sempre
     }
   };
 
@@ -276,12 +270,12 @@ export default function PaymentScreen() {
         <TouchableOpacity
           style={[
             styles.generateQrCodeButton,
-            (!selectedTariff || generatingPayment) && styles.generateQrCodeButtonDisabled
+            (!selectedTariff || loading) && styles.generateQrCodeButtonDisabled
           ]}
           onPress={handleGenerateQRCode}
-          disabled={!selectedTariff || generatingPayment}
+          disabled={!selectedTariff || loading}
         >
-          {generatingPayment ? (
+          {loading ? (
             <View style={styles.buttonContent}>
               <ActivityIndicator size="small" color="#fff" style={styles.buttonSpinner} />
               <Text style={styles.generateQrCodeButtonText}>Gerando...</Text>
