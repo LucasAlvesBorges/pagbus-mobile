@@ -35,13 +35,15 @@ export function AuthTextInput({
     }
   };
 
+  const hasError = !!errorMessage;
+
   return (
     <View style={containerStyle}>
       <Text style={styles.label}>{label}</Text>
-      <View style={styles.inputWrapper}>
+      <View style={[styles.inputWrapper, hasError && styles.inputWrapperError]}>
         <TextInput
           {...rest}
-          style={[styles.input, style]}
+          style={[styles.input, hasError && styles.inputError, style]}
           placeholderTextColor="#90A4C8"
           secureTextEntry={isSecure}
         />
@@ -83,9 +85,19 @@ const styles = StyleSheet.create({
     transform: [{ translateY: -11 }],
     padding: 4,
   },
+  inputWrapperError: {
+    borderWidth: 2,
+    borderColor: '#FF3B30',
+    borderRadius: 18,
+  },
+  inputError: {
+    backgroundColor: '#FFF5F5',
+    color: '#FF3B30',
+  },
   errorText: {
     marginTop: 6,
-    color: '#d14343',
+    color: '#FF3B30',
     fontSize: 13,
+    fontWeight: '500',
   },
 });

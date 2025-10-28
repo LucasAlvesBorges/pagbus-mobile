@@ -136,11 +136,6 @@ api.interceptors.response.use(
     if (error.response) {
       // Erro com resposta do servidor
       const { status, data } = error.response;
-      
-      console.error('Erro na resposta:', {
-        status,
-        data,
-      });
 
       // Lançar erro customizado
       return Promise.reject({
@@ -150,16 +145,12 @@ api.interceptors.response.use(
       });
     } else if (error.request) {
       // Erro na requisição (sem resposta)
-      console.error('Erro na requisição:', error.request);
-      
       return Promise.reject({
         status: 0,
         message: 'Erro de conexão. Verifique sua internet.',
       });
     } else {
       // Erro na configuração da requisição
-      console.error('Erro na configuração:', error.message);
-      
       return Promise.reject({
         status: 0,
         message: error.message || 'Erro desconhecido',

@@ -4,6 +4,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { buslineService, BusLine } from '../../services/buslineService';
+import { authService } from '../../services/authService';
 
 export default function SelectBusLineScreen() {
   const router = useRouter();
@@ -62,8 +63,30 @@ export default function SelectBusLineScreen() {
     });
   };
 
-  const handleGoBack = () => {
-    router.back();
+  const handleLogout = async () => {
+    Alert.alert(
+      'Sair',
+      'Tem certeza que deseja sair da aplicação?',
+      [
+        {
+          text: 'Cancelar',
+          style: 'cancel',
+        },
+        {
+          text: 'Sair',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await authService.logout();
+              router.replace('/(auth)');
+            } catch (error) {
+              console.error('Erro ao fazer logout:', error);
+              Alert.alert('Erro', 'Não foi possível fazer logout');
+            }
+          },
+        },
+      ]
+    );
   };
 
   return (
@@ -72,8 +95,9 @@ export default function SelectBusLineScreen() {
 
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={handleGoBack} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color="#007AFF" />
+        <TouchableOpacity onPress={handleLogout} style={styles.logoutButton}>
+          <Ionicons name="exit-outline" size={20} color="#FF3B30" />
+          <Text style={styles.logoutText}>Sair</Text>
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Selecionar Linha</Text>
         <View style={styles.placeholder} />
@@ -168,16 +192,24 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 3,
   },
-  backButton: {
+  placeholder: {
+    width: 40,
+  },
+  logoutButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
     padding: 8,
+  },
+  logoutText: {
+    fontSize: 16,
+    color: '#FF3B30',
+    fontWeight: '500',
   },
   headerTitle: {
     fontSize: 20,
     fontWeight: '600',
     color: '#1a1a1a',
-  },
-  placeholder: {
-    width: 40,
   },
   content: {
     flex: 1,

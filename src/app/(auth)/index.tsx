@@ -52,14 +52,29 @@ export default function LoginScreen() {
       setPassword('');
       router.replace('/payment/select-busline');
     } catch (error: any) {
-      console.error('Erro ao realizar login:', error);
-
-      const message =
-        error?.message ||
-        error?.data?.detail ||
-        'Não foi possível realizar o login. Verifique suas credenciais.';
-
-      Alert.alert('Erro ao entrar', message);
+      const detail = error?.data?.detail || error?.message || '';
+      
+      // Verificar tipo específico de erro do backend
+      if (detail === 'User not found.') {
+        setErrors({
+          matricula: 'Usuário não encontrado',
+        });
+      } else if (detail === 'Invalid password.') {
+        setErrors({
+          password: 'Senha incorreta',
+        });
+      } else if (detail.toLowerCase().includes('invalid credentials')) {
+        // Fallback para outros tipos de erro de credenciais
+        setErrors({
+          matricula: 'Matrícula ou senha incorretos',
+          password: 'Matrícula ou senha incorretos',
+        });
+      } else {
+        // Erro genérico
+        setErrors({
+          matricula: 'Erro ao fazer login',
+        });
+      }
     } finally {
       setLoading(false);
     }
