@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { StyleSheet, Text, View, TouchableOpacity, ScrollView, Alert, ActivityIndicator } from 'react-native';
+import { StyleSheet, Text, View, TouchableOpacity, ScrollView, Alert, ActivityIndicator, TextInput } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -11,6 +11,8 @@ export default function SelectVehicleScreen() {
   const { busLineId, busLineName, busLineCode, busLineCompany } = params;
   
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+  const [filteredVehicles, setFilteredVehicles] = useState<Vehicle[]>([]);
+  const [searchText, setSearchText] = useState('');
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -24,6 +26,7 @@ export default function SelectVehicleScreen() {
       const companyId = busLineCompany ? parseInt(busLineCompany as string) : 1;
       const data = await vehicleService.getVehicles(companyId);
       setVehicles(data);
+      setFilteredVehicles(data);
     } catch (error: any) {
       console.error('Erro ao carregar veículos:', error);
       Alert.alert(
@@ -34,6 +37,20 @@ export default function SelectVehicleScreen() {
       setLoading(false);
     }
   };
+
+  // Filtrar veículos baseado na busca
+  useEffect(() => {
+    if (searchText.trim() === '') {
+      setFilteredVehicles(vehicles);
+    } else {
+      const filtered = vehicles.filter(vehicle => {
+        const search = searchText.toLowerCase();
+        const prefix = vehicle.prefix.toLowerCase();
+        return prefix.includes(search);
+      });
+      setFilteredVehicles(filtered);
+    }
+  }, [searchText, vehicles]);
 
   const handleSelectVehicle = (vehicle: Vehicle) => {
     const params = {
@@ -79,19 +96,53 @@ export default function SelectVehicleScreen() {
           </View>
         </View>
 
+        {/* Campo de busca */}
+        {!loading && vehicles.length > 0 && (
+          <View style={styles.searchContainer}>
+            <View style={styles.searchBox}>
+              <Ionicons name="search" size={20} color="#999" style={styles.searchIcon} />
+              <TextInput
+                style={styles.searchInput}
+                placeholder="Buscar por prefixo do veículo..."
+                value={searchText}
+                onChangeText={setSearchText}
+                autoCapitalize="none"
+              />
+              {searchText.length > 0 && (
+                <TouchableOpacity
+                  onPress={() => setSearchText('')}
+                  style={styles.clearButton}
+                >
+                  <Ionicons name="close-circle" size={20} color="#999" />
+                </TouchableOpacity>
+              )}
+            </View>
+            {searchText.length > 0 && (
+              <Text style={styles.resultsCount}>
+                {filteredVehicles.length} {filteredVehicles.length === 1 ? 'veículo encontrado' : 'veículos encontrados'}
+              </Text>
+            )}
+          </View>
+        )}
+
         {loading ? (
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color="#007AFF" />
             <Text style={styles.loadingText}>Carregando veículos...</Text>
           </View>
-        ) : vehicles.length === 0 ? (
+        ) : filteredVehicles.length === 0 ? (
           <View style={styles.emptyContainer}>
             <Ionicons name="car-outline" size={64} color="#ccc" />
-            <Text style={styles.emptyText}>Nenhum veículo disponível</Text>
+            <Text style={styles.emptyText}>
+              {searchText ? 'Nenhum veículo encontrado' : 'Nenhum veículo disponível'}
+            </Text>
+            {searchText && (
+              <Text style={styles.emptySubText}>Tente buscar por outro prefixo</Text>
+            )}
           </View>
         ) : (
           <>
-            {vehicles.map((vehicle) => (
+            {filteredVehicles.map((vehicle) => (
               <TouchableOpacity
                 key={vehicle.prefix}
                 style={styles.vehicleCard}
@@ -148,6 +199,42 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 16,
   },
+  searchContainer: {
+    marginBottom: 16,
+  },
+  searchBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    paddingHorizontal: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  searchIcon: {
+    marginRight: 8,
+  },
+  searchInput: {
+    flex: 1,
+    height: 48,
+    fontSize: 16,
+    color: '#1a1a1a',
+  },
+  clearButton: {
+    marginLeft: 8,
+    padding: 4,
+  },
+  resultsCount: {
+    fontSize: 14,
+    color: '#666',
+    marginTop: 8,
+    paddingLeft: 4,
+  },
   selectedInfoBox: {
     backgroundColor: '#E8F5E9',
     padding: 16,
@@ -193,6 +280,13 @@ const styles = StyleSheet.create({
     marginTop: 16,
     fontSize: 16,
     color: '#666',
+    textAlign: 'center',
+  },
+  emptySubText: {
+    marginTop: 8,
+    fontSize: 14,
+    color: '#999',
+    textAlign: 'center',
   },
   infoBox: {
     backgroundColor: '#E3F2FD',

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { StyleSheet, Text, View, TouchableOpacity, ScrollView, Alert, ActivityIndicator } from 'react-native';
+import { StyleSheet, Text, View, TouchableOpacity, ScrollView, Alert, ActivityIndicator, TextInput } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -8,6 +8,8 @@ import { buslineService, BusLine } from '../../services/buslineService';
 export default function SelectBusLineScreen() {
   const router = useRouter();
   const [busLines, setBusLines] = useState<BusLine[]>([]);
+  const [filteredBusLines, setFilteredBusLines] = useState<BusLine[]>([]);
+  const [searchText, setSearchText] = useState('');
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -21,6 +23,7 @@ export default function SelectBusLineScreen() {
       const companyId = 1; // Temporário - deveria vir do contexto de autenticação
       const data = await buslineService.getBusLines(companyId);
       setBusLines(data);
+      setFilteredBusLines(data);
     } catch (error: any) {
       console.error('Erro ao carregar linhas:', error);
       Alert.alert(
@@ -31,6 +34,21 @@ export default function SelectBusLineScreen() {
       setLoading(false);
     }
   };
+
+  // Filtrar linhas baseado na busca
+  useEffect(() => {
+    if (searchText.trim() === '') {
+      setFilteredBusLines(busLines);
+    } else {
+      const filtered = busLines.filter(line => {
+        const search = searchText.toLowerCase();
+        const name = line.name.toLowerCase();
+        const code = line.busline_code.toLowerCase();
+        return name.includes(search) || code.includes(search);
+      });
+      setFilteredBusLines(filtered);
+    }
+  }, [searchText, busLines]);
 
   const handleSelectBusLine = (busLine: BusLine) => {
     router.push({
@@ -62,19 +80,53 @@ export default function SelectBusLineScreen() {
       </View>
 
       <ScrollView style={styles.content}>
+        {/* Campo de busca */}
+        {!loading && busLines.length > 0 && (
+          <View style={styles.searchContainer}>
+            <View style={styles.searchBox}>
+              <Ionicons name="search" size={20} color="#999" style={styles.searchIcon} />
+              <TextInput
+                style={styles.searchInput}
+                placeholder="Buscar por nome ou código da linha..."
+                value={searchText}
+                onChangeText={setSearchText}
+                autoCapitalize="none"
+              />
+              {searchText.length > 0 && (
+                <TouchableOpacity
+                  onPress={() => setSearchText('')}
+                  style={styles.clearButton}
+                >
+                  <Ionicons name="close-circle" size={20} color="#999" />
+                </TouchableOpacity>
+              )}
+            </View>
+            {searchText.length > 0 && (
+              <Text style={styles.resultsCount}>
+                {filteredBusLines.length} {filteredBusLines.length === 1 ? 'linha encontrada' : 'linhas encontradas'}
+              </Text>
+            )}
+          </View>
+        )}
+
         {loading ? (
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color="#007AFF" />
             <Text style={styles.loadingText}>Carregando linhas...</Text>
           </View>
-        ) : busLines.length === 0 ? (
+        ) : filteredBusLines.length === 0 ? (
           <View style={styles.emptyContainer}>
             <Ionicons name="bus-outline" size={64} color="#ccc" />
-            <Text style={styles.emptyText}>Nenhuma linha disponível</Text>
+            <Text style={styles.emptyText}>
+              {searchText ? 'Nenhuma linha encontrada' : 'Nenhuma linha disponível'}
+            </Text>
+            {searchText && (
+              <Text style={styles.emptySubText}>Tente buscar por outro termo</Text>
+            )}
           </View>
         ) : (
           <>
-            {busLines.map((line) => (
+            {filteredBusLines.map((line) => (
               <TouchableOpacity
                 key={line.id}
                 style={styles.busLineCard}
@@ -131,6 +183,42 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 16,
   },
+  searchContainer: {
+    marginBottom: 16,
+  },
+  searchBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    paddingHorizontal: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  searchIcon: {
+    marginRight: 8,
+  },
+  searchInput: {
+    flex: 1,
+    height: 48,
+    fontSize: 16,
+    color: '#1a1a1a',
+  },
+  clearButton: {
+    marginLeft: 8,
+    padding: 4,
+  },
+  resultsCount: {
+    fontSize: 14,
+    color: '#666',
+    marginTop: 8,
+    paddingLeft: 4,
+  },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -152,6 +240,13 @@ const styles = StyleSheet.create({
     marginTop: 16,
     fontSize: 16,
     color: '#666',
+    textAlign: 'center',
+  },
+  emptySubText: {
+    marginTop: 8,
+    fontSize: 14,
+    color: '#999',
+    textAlign: 'center',
   },
   infoBox: {
     backgroundColor: '#E3F2FD',
