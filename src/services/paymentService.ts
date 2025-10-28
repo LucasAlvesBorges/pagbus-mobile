@@ -26,6 +26,9 @@ export interface PaymentRequest {
 
 export interface PaymentResponse {
   redirect_url: string;
+  qr_code?: string;
+  qr_code_base64?: string;
+  copy_paste?: string;
   transaction: {
     id: string;
     payment_id?: string;

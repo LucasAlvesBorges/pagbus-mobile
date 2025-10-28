@@ -2,18 +2,12 @@ import { StyleSheet, Text, View, TouchableOpacity, ScrollView } from 'react-nati
 import { StatusBar } from 'expo-status-bar';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { formatCurrencyWithSymbol } from '../../utils/currency';
 
 export default function PaymentSuccessScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
   const { tariffName, tariffValue, transactionId, busLineId, busLineName, busLineCode, vehiclePrefix } = params;
-
-  // Formatar valor em reais (BRL)
-  const formatCurrency = (value: string | string[] | undefined): string => {
-    if (!value) return '0,00';
-    const numValue = parseFloat(Array.isArray(value) ? value[0] : value);
-    return numValue.toFixed(2).replace('.', ',');
-  };
 
   const handleBackToTariffs = () => {
     // Se tiver informações de linha e veículo, voltar para tela de tarifas
@@ -60,7 +54,7 @@ export default function PaymentSuccessScreen() {
             <Ionicons name="cash-outline" size={24} color="#007AFF" />
             <View style={styles.infoTextContainer}>
               <Text style={styles.infoLabel}>Valor Pago</Text>
-              <Text style={styles.infoValue}>R$ {formatCurrency(tariffValue)}</Text>
+              <Text style={styles.infoValue}>{formatCurrencyWithSymbol(Array.isArray(tariffValue) ? tariffValue[0] : tariffValue)}</Text>
             </View>
           </View>
 

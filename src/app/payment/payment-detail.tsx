@@ -1,27 +1,34 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState, useEffect, useRef } from 'react';
-import { StyleSheet, Text, View, TouchableOpacity, ScrollView, Alert } from 'react-native';
-import QRCode from 'react-native-qrcode-svg';
+import { StyleSheet, Text, View, TouchableOpacity, ScrollView, Alert, Image } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import Clipboard from '@react-native-clipboard/clipboard';
 import { Ionicons } from '@expo/vector-icons';
 import { paymentService } from '../../services/paymentService';
+import { formatCurrencyWithSymbol } from '../../utils/currency';
 
 export default function PaymentDetailScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
-  const { tariffName, tariffValue, qrCodeData, pixLink, transactionId, busLineId, busLineName, busLineCode, vehiclePrefix } = params;
+  const { tariffName, tariffValue, qrCodeData, qrCodeBase64, copyPaste, pixLink, transactionId, busLineId, busLineName, busLineCode, vehiclePrefix } = params;
   const [isCheckingPayment, setIsCheckingPayment] = useState(false);
+  const [copied, setCopied] = useState(false);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const hasNavigatedRef = useRef(false);
 
   const copyToClipboard = (text: string) => {
     try {
       Clipboard.setString(text);
-      Alert.alert('Sucesso', 'Link PIX copiado para a área de transferência!');
+      setCopied(true);
+      Alert.alert('Sucesso', 'Código PIX copiado para a área de transferência!');
+      
+      // Reset copied state after 3 seconds
+      setTimeout(() => {
+        setCopied(false);
+      }, 3000);
     } catch (error) {
       console.error('Erro ao copiar:', error);
-      Alert.alert('Erro', 'Não foi possível copiar o link');
+      Alert.alert('Erro', 'Não foi possível copiar o código');
     }
   };
 
@@ -107,63 +114,33 @@ export default function PaymentDetailScreen() {
         <View style={styles.infoBox}>
           <Ionicons name="receipt-outline" size={32} color="#007AFF" />
           <Text style={styles.infoTitle}>{tariffName}</Text>
-          <Text style={styles.infoAmount}>R$ {tariffValue}</Text>
+          <Text style={styles.infoAmount}>{formatCurrencyWithSymbol(Array.isArray(tariffValue) ? tariffValue[0] : tariffValue)}</Text>
         </View>
 
         {/* QR Code */}
         <View style={styles.qrSection}>
-          <Text style={styles.qrTitle}>Escaneie o QR Code</Text>
-          <Text style={styles.qrSubtitle}>Use o app do seu banco para escanear</Text>
+          <Text style={styles.qrTitle}>QR Code PIX</Text>
+          <Text style={styles.qrSubtitle}>Escaneie com o app do seu banco</Text>
           
           <View style={styles.qrCodeWrapper}>
-            <QRCode
-              value={qrCodeData as string}
-              size={280}
-              color="#000"
-              backgroundColor="#fff"
-            />
+            {qrCodeBase64 ? (
+              <Image
+                source={{ uri: `data:image/png;base64,${qrCodeBase64}` }}
+                style={styles.qrCodeImage}
+                resizeMode="contain"
+              />
+            ) : (
+              <Text style={styles.errorText}>
+                QR Code não disponível. Use a opção de copiar PIX abaixo.
+              </Text>
+            )}
           </View>
-        </View>
-
-        {/* Link PIX */}
-        <View style={styles.linkSection}>
-          <Text style={styles.linkTitle}>Ou use o link PIX</Text>
-          <TouchableOpacity
-            style={styles.linkButton}
-            onPress={() => copyToClipboard(pixLink as string)}
-          >
-            <Ionicons name="copy-outline" size={20} color="#fff" />
-            <Text style={styles.linkButtonText}>Copiar link PIX</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Informações Adicionais */}
-        <View style={styles.instructionsBox}>
-          <Text style={styles.instructionsTitle}>Como pagar</Text>
-          <View style={styles.instructionsList}>
-            <View style={styles.instructionItem}>
-              <Ionicons name="qr-code-outline" size={20} color="#007AFF" />
-              <Text style={styles.instructionText}>Escaneie o código acima com seu app bancário</Text>
-            </View>
-            <View style={styles.instructionItem}>
-              <Ionicons name="copy-outline" size={20} color="#007AFF" />
-              <Text style={styles.instructionText}>Ou copie o link PIX e cole no app</Text>
-            </View>
-            <View style={styles.instructionItem}>
-              <Ionicons name="checkmark-circle-outline" size={20} color="#007AFF" />
-              <Text style={styles.instructionText}>Confirme o pagamento no app do seu banco</Text>
-            </View>
-          </View>
-        </View>
-
-        {/* Nota Importante */}
-        <View style={styles.noteBox}>
-          <Ionicons name="information-circle-outline" size={20} color="#FF9500" />
-          <Text style={styles.noteText}>
-            Após o pagamento, aguarde a confirmação. O recibo será gerado automaticamente.
+          
+          <Text style={styles.qrInstructions}>
+            Abra o app do seu banco e escaneie este QR Code para pagar via PIX
           </Text>
         </View>
-
+        
         {/* Status de verificação */}
         {isCheckingPayment && (
           <View style={styles.statusBox}>
@@ -262,6 +239,47 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.15,
     shadowRadius: 8,
     elevation: 5,
+    marginBottom: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 240,
+  },
+  qrCodeImage: {
+    width: 240,
+    height: 240,
+  },
+  qrInstructions: {
+    fontSize: 14,
+    color: '#666',
+    textAlign: 'center',
+    lineHeight: 20,
+    paddingHorizontal: 20,
+  },
+  errorText: {
+    fontSize: 14,
+    color: '#ff6b6b',
+    textAlign: 'center',
+    padding: 20,
+  },
+  pixCodeContainer: {
+    backgroundColor: '#f8f9fa',
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#e9ecef',
+  },
+  pixCode: {
+    fontSize: 12,
+    color: '#495057',
+    textAlign: 'center',
+    fontFamily: 'monospace',
+  },
+  copiedButton: {
+    backgroundColor: '#28a745',
+  },
+  linkButtonDisabled: {
+    backgroundColor: '#ccc',
   },
   linkSection: {
     alignItems: 'center',

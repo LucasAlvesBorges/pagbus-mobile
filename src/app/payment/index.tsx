@@ -2,11 +2,12 @@ import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
-import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View, ActivityIndicator } from 'react-native';
 import { API_URL } from '../../config/env';
 import { PaymentRequest, paymentService } from '../../services/paymentService';
 import { buslineService, Tariff } from '../../services/buslineService';
 import { authService } from '../../services/authService';
+import { formatCurrency, formatCurrencyWithSymbol } from '../../utils/currency';
 
 export default function PaymentScreen() {
   const router = useRouter();
@@ -18,6 +19,8 @@ export default function PaymentScreen() {
   const [quantity, setQuantity] = useState(1);
   const [tariffs, setTariffs] = useState<Tariff[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedTariff, setSelectedTariff] = useState<Tariff | null>(null);
+  const [generatingPayment, setGeneratingPayment] = useState(false);
 
   // Redirecionar se não houver linha selecionada
   useEffect(() => {
@@ -40,19 +43,26 @@ export default function PaymentScreen() {
     
     try {
       setLoading(true);
-      // Buscar os detalhes da linha que incluem as tarifas
+      console.log('🔍 Buscando linha ID:', busLineId);
       const lineData = await buslineService.getBusLineById(parseInt(busLineId as string));
-      console.log('📊 Linha carregada:', lineData);
+      console.log('📊 Dados da linha recebidos:', JSON.stringify(lineData, null, 2));
       
       // Usar as tarifas da linha
       if (lineData.tariffs && lineData.tariffs.length > 0) {
+        console.log('✅ Tarifas encontradas:', lineData.tariffs);
         setTariffs(lineData.tariffs);
+        setSelectedTariff(lineData.tariffs[0]);
       } else {
+        console.log('⚠️ Nenhuma tarifa encontrada na linha');
         Alert.alert('Aviso', 'Esta linha não possui tarifas cadastradas');
+        setTariffs([]);
+        setSelectedTariff(null);
       }
     } catch (error: any) {
-      console.error('Erro ao carregar tarifas da linha:', error);
+      console.error('❌ Erro ao carregar tarifas da linha:', error);
       Alert.alert('Erro', 'Não foi possível carregar as tarifas desta linha');
+      setTariffs([]);
+      setSelectedTariff(null);
     } finally {
       setLoading(false);
     }
@@ -66,12 +76,23 @@ export default function PaymentScreen() {
     setQuantity(prev => Math.max(prev - 1, 1));
   };
 
-  const handleSelectTariff = async (tariff: Tariff) => {
-    try {
-      console.log('🌐 URL da API:', API_URL);
-      console.log('🗝️ Iniciando geração de pagamento para:', `Tarifa R$ ${tariff.value}`);
+  const handleSelectTariff = (tariff: Tariff) => {
+    setSelectedTariff(tariff);
+  };
 
-      const tariffValue = parseFloat(tariff.value);
+  const handleGenerateQRCode = async () => {
+    if (!selectedTariff) {
+      Alert.alert('Aviso', 'Por favor, selecione uma tarifa.');
+      return;
+    }
+    
+    try {
+      setGeneratingPayment(true); // Ativar spinner do botão
+      
+      console.log('🌐 URL da API:', API_URL);
+      console.log('🗝️ Iniciando geração de pagamento para:', `Tarifa ${formatCurrencyWithSymbol(selectedTariff.value)}`);
+
+      const tariffValue = parseFloat(selectedTariff.value);
       const totalAmount = tariffValue * quantity;
       
       // Extrair company_id do busLineCompany ou usar padrão
@@ -84,7 +105,7 @@ export default function PaymentScreen() {
         company_id: companyId,
         items: [
           {
-            title: `${quantity}x Tarifa R$ ${tariff.value} - ${busLineName} (${busLineCode}) - ${vehiclePrefix}`,
+            title: `${quantity}x Tarifa ${formatCurrencyWithSymbol(selectedTariff.value)} - ${busLineName} (${busLineCode}) - ${vehiclePrefix}`,
             quantity: quantity,
             unit_price: tariffValue,
             currency_id: 'BRL',
@@ -101,28 +122,34 @@ export default function PaymentScreen() {
 
       console.log('📤 Enviando requisição para API:', paymentData);
 
-      const response = await paymentService.createPayment(paymentData);
+            const response = await paymentService.createPayment(paymentData);
 
-      console.log('📥 Resposta da API:', response);
+            console.log('📥 Resposta da API:', response);
 
-      const qrCodeData = response.transaction.pagamento_url;
-      const pixLink = response.redirect_url || response.transaction.pagamento_url;
-      const transactionId = response.transaction.id.toString();
+            const qrCodeData = response.qr_code || response.transaction.pagamento_url;
+            const qrCodeBase64 = response.qr_code_base64;
+            const copyPaste = response.copy_paste || response.qr_code;
+            const pixLink = response.redirect_url || response.transaction.pagamento_url;
+            const transactionId = response.transaction.id.toString();
 
       console.log('✅ QR Code gerado:', qrCodeData);
+      console.log('✅ QR Code Base64:', qrCodeBase64 ? 'Disponível' : 'Não disponível');
+      console.log('✅ Copy/Paste:', copyPaste);
       console.log('✅ Link PIX:', pixLink);
       console.log('✅ Transaction ID:', transactionId);
 
       router.push({
         pathname: '/payment/payment-detail',
         params: {
-          tariffName: `${quantity}x Tarifa R$ ${tariff.value}`,
+          tariffName: `${quantity}x Tarifa ${formatCurrencyWithSymbol(selectedTariff.value)}`,
           tariffValue: totalAmount.toString(),
           busLineId: busLineId as string,
           busLineName: busLineName as string,
           busLineCode: busLineCode as string,
           vehiclePrefix: vehiclePrefix as string,
           qrCodeData: qrCodeData,
+          qrCodeBase64: qrCodeBase64 || '',
+          copyPaste: copyPaste,
           pixLink: pixLink,
           transactionId: transactionId,
         },
@@ -134,6 +161,8 @@ export default function PaymentScreen() {
         'Erro ao conectar com o servidor',
         error?.message || 'Verifique se o backend está rodando e acessível.'
       );
+    } finally {
+      setGeneratingPayment(false); // Desativar spinner do botão sempre
     }
   };
 
@@ -177,53 +206,90 @@ export default function PaymentScreen() {
           </View>
         )}
 
-        <Text style={styles.sectionDescription}>
-          Selecione o valor da passagem que deseja pagar
-        </Text>
+        {/* Valor da Tarifa */}
+        <View style={styles.card}>
+          <Text style={styles.cardLabel}>Valor da Tarifa</Text>
+          {loading ? (
+            <View style={styles.loadingContainer}>
+              <Text style={styles.loadingText}>Carregando...</Text>
+            </View>
+          ) : tariffs.length === 0 ? (
+            <Text style={styles.emptyText}>Nenhuma tarifa disponível</Text>
+          ) : (
+            <View style={styles.tariffGrid}>
+              {tariffs.map((tariff) => (
+                <TouchableOpacity
+                  key={tariff.id}
+                  style={[
+                    styles.tariffGridButton,
+                    selectedTariff?.id === tariff.id && styles.tariffGridButtonSelected,
+                  ]}
+                  onPress={() => handleSelectTariff(tariff)}
+                >
+                  <Text
+                    style={[
+                      styles.tariffGridButtonText,
+                      selectedTariff?.id === tariff.id && styles.tariffGridButtonTextSelected,
+                    ]}
+                  >
+                    {formatCurrencyWithSymbol(tariff.value)}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
+        </View>
 
-        <View style={styles.quantitySelector}>
-          <Text style={styles.quantityLabel}>Quantidade de passagens</Text>
+        {/* Quantidade de Passagens */}
+        <View style={styles.card}>
+          <Text style={styles.cardLabel}>Quantidade de Passagens</Text>
           <View style={styles.quantityControls}>
-            <TouchableOpacity 
-              style={styles.quantityButton} 
+            <TouchableOpacity
+              style={styles.quantityStepperButton}
               onPress={handleDecreaseQuantity}
             >
-              <Ionicons name="remove-circle-outline" size={32} color="#007AFF" />
+              <Text style={styles.quantityStepperText}>-</Text>
             </TouchableOpacity>
             <View style={styles.quantityDisplay}>
               <Text style={styles.quantityText}>{quantity}</Text>
             </View>
-            <TouchableOpacity 
-              style={styles.quantityButton} 
+            <TouchableOpacity
+              style={styles.quantityStepperButton}
               onPress={handleIncreaseQuantity}
             >
-              <Ionicons name="add-circle-outline" size={32} color="#007AFF" />
+              <Text style={styles.quantityStepperText}>+</Text>
             </TouchableOpacity>
           </View>
         </View>
 
-        {loading ? (
-          <View style={styles.loadingContainer}>
-            <Text style={styles.loadingText}>Carregando tarifas...</Text>
+        {/* Total a Pagar */}
+        <View style={styles.totalCardWrapper}>
+          <View style={styles.totalCard}>
+            <Text style={styles.totalLabel}>Total a Pagar:</Text>
+            <Text style={styles.totalValue}>{formatCurrencyWithSymbol(selectedTariff ? parseFloat(selectedTariff.value) * quantity : 0)}</Text>
           </View>
-        ) : tariffs.length === 0 ? (
-          <View style={styles.emptyContainer}>
-            <Text style={styles.emptyText}>Nenhuma tarifa disponível</Text>
-          </View>
-        ) : (
-          <View style={styles.tariffContainer}>
-            {tariffs.map((tariff) => (
-              <TouchableOpacity
-                key={tariff.id}
-                style={styles.tariffButton}
-                onPress={() => handleSelectTariff(tariff)}
-              >
-                <Text style={styles.tariffText}>Tarifa R$ {tariff.value}</Text>
-                <Text style={styles.tariffValue}>R$ {tariff.value}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        )}
+        </View>
+      </View>
+
+      {/* Botão Gerar QR Code */}
+      <View style={styles.bottomButtonContainer}>
+        <TouchableOpacity
+          style={[
+            styles.generateQrCodeButton,
+            (!selectedTariff || generatingPayment) && styles.generateQrCodeButtonDisabled
+          ]}
+          onPress={handleGenerateQRCode}
+          disabled={!selectedTariff || generatingPayment}
+        >
+          {generatingPayment ? (
+            <View style={styles.buttonContent}>
+              <ActivityIndicator size="small" color="#fff" style={styles.buttonSpinner} />
+              <Text style={styles.generateQrCodeButtonText}>Gerando...</Text>
+            </View>
+          ) : (
+            <Text style={styles.generateQrCodeButtonText}>Gerar QR Code</Text>
+          )}
+        </TouchableOpacity>
       </View>
     </ScrollView>
   );
@@ -232,170 +298,171 @@ export default function PaymentScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#f6f7f8',
   },
   header: {
-    backgroundColor: '#fff',
-    paddingTop: 50,
-    paddingBottom: 16,
-    paddingHorizontal: 16,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    paddingTop: 50,
+    padding: 16,
+    paddingBottom: 8,
+    backgroundColor: '#f6f7f8',
   },
   backButton: {
     padding: 8,
   },
   headerTitle: {
-    fontSize: 20,
-    fontWeight: '600',
+    fontSize: 18,
+    fontWeight: 'bold',
     color: '#1a1a1a',
+    flex: 1,
+    textAlign: 'center',
+    paddingRight: 48,
   },
   placeholder: {
     width: 40,
   },
   content: {
     flex: 1,
-    padding: 24,
-    paddingTop: 16,
+    padding: 16,
+    paddingBottom: 120, // Espaço para o botão fixo na parte inferior
+    gap: 24,
   },
   selectedInfoBox: {
-    backgroundColor: '#E8F5E9',
-    padding: 16,
-    borderRadius: 12,
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 20,
-    gap: 12,
-    borderLeftWidth: 4,
-    borderLeftColor: '#4CAF50',
+    backgroundColor: '#fff',
+    padding: 16,
+    borderRadius: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 2,
+    marginBottom: 16,
   },
   selectedInfo: {
     flex: 1,
+    marginLeft: 12,
   },
   selectedText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#2E7D32',
-    marginBottom: 4,
+    color: '#1a1a1a',
   },
   selectedSubText: {
     fontSize: 14,
     color: '#666',
   },
   changeButton: {
-    paddingHorizontal: 12,
     paddingVertical: 6,
-    borderRadius: 8,
-    backgroundColor: '#4CAF50',
+    paddingHorizontal: 12,
+    borderRadius: 6,
+    backgroundColor: '#e0e0e0',
   },
   changeButtonText: {
-    color: '#fff',
     fontSize: 14,
-    fontWeight: '600',
+    color: '#1a1a1a',
+    fontWeight: '500',
   },
-  sectionTitle: {
-    fontSize: 24,
-    fontWeight: '600',
-    marginBottom: 8,
+  card: {
+    backgroundColor: '#fff',
+    padding: 16,
+    borderRadius: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 2,
+    gap: 12,
+  },
+  cardLabel: {
+    fontSize: 16,
+    fontWeight: 'normal',
     color: '#1a1a1a',
   },
-  sectionDescription: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 24,
+  tariffGrid: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 8,
   },
-  tariffContainer: {
-    gap: 16,
-    marginBottom: 32,
-  },
-  tariffButton: {
-    backgroundColor: '#fff',
-    padding: 24,
-    borderRadius: 16,
-    borderWidth: 2,
-    borderColor: '#e0e0e0',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+  tariffGridButton: {
+    flex: 1,
     alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 8,
+    height: 48,
+    backgroundColor: '#f1f5f9',
   },
-  tariffText: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 8,
+  tariffGridButtonSelected: {
+    backgroundColor: '#1173d4',
   },
-  tariffValue: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: '#007AFF',
-  },
-  infoBox: {
-    backgroundColor: '#E3F2FD',
-    padding: 20,
-    borderRadius: 12,
-    borderLeftWidth: 4,
-    borderLeftColor: '#007AFF',
-  },
-  infoTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#007AFF',
-    marginBottom: 12,
-  },
-  infoText: {
-    fontSize: 14,
-    color: '#333',
-    lineHeight: 22,
-  },
-  quantitySelector: {
-    backgroundColor: '#fff',
-    padding: 20,
-    borderRadius: 16,
-    marginBottom: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  quantityLabel: {
+  tariffGridButtonText: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 16,
-    textAlign: 'center',
+    fontWeight: '500',
+    color: '#1a1a1a',
+  },
+  tariffGridButtonTextSelected: {
+    color: '#fff',
   },
   quantityControls: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: 20,
+    gap: 16,
   },
-  quantityButton: {
-    padding: 8,
+  quantityStepperButton: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 9999,
+    width: 32,
+    height: 32,
+    backgroundColor: '#e2e8f0',
+  },
+  quantityStepperText: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#1a1a1a',
   },
   quantityDisplay: {
-    backgroundColor: '#F0F8FF',
-    minWidth: 80,
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 8,
-    borderWidth: 2,
-    borderColor: '#007AFF',
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: 48,
+    backgroundColor: 'transparent',
   },
   quantityText: {
-    fontSize: 32,
+    fontSize: 20,
     fontWeight: 'bold',
-    color: '#007AFF',
+    color: '#1a1a1a',
+  },
+  totalCardWrapper: {
+    paddingHorizontal: 0,
+  },
+        totalCard: {
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          borderRadius: 8,
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: 1 },
+          shadowOpacity: 0.05,
+          shadowRadius: 2,
+          elevation: 2,
+          backgroundColor: '#fff',
+          padding: 16,
+          gap: 4,
+        },
+  totalLabel: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#1a1a1a',
+    textAlign: 'center',
+  },
+  totalValue: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#1173d4',
     textAlign: 'center',
   },
   loadingContainer: {
@@ -412,6 +479,52 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: 16,
-    color: '#666',
+    color: '#999',
+  },
+  bottomButtonContainer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    paddingBottom: 34, // Espaço para a barra de navegação do sistema
+    backgroundColor: '#f6f7f8',
+  },
+  generateQrCodeButton: {
+    flex: 1,
+    minWidth: 84,
+    maxWidth: 480,
+    alignSelf: 'center',
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+    borderRadius: 8,
+    height: 56,
+    paddingHorizontal: 20,
+    backgroundColor: '#1173d4',
+    shadowColor: '#1173d4',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 8,
+  },
+  generateQrCodeButtonDisabled: {
+    backgroundColor: '#94a3b8',
+    shadowOpacity: 0.1,
+    elevation: 2,
+  },
+  buttonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  buttonSpinner: {
+    marginRight: 8,
+  },
+  generateQrCodeButtonText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#fff',
   },
 });
