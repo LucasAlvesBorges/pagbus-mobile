@@ -1,15 +1,17 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Alert,
   KeyboardAvoidingView,
   Platform,
   StyleSheet,
   Text,
-  View
+  View,
+  TouchableOpacity
 } from 'react-native';
+import * as SecureStore from 'expo-secure-store';
 
 import { AuthButton, AuthTextInput } from '../../components/auth';
 import { authService } from '../../services/authService';
@@ -20,6 +22,42 @@ export default function LoginScreen() {
   const [password, setPassword] = useState('4705');
   const [errors, setErrors] = useState<{ matricula?: string; password?: string }>({});
   const [loading, setLoading] = useState(false);
+  const [savePassword, setSavePassword] = useState(false);
+
+  // Carregar credenciais salvas ao inicializar
+  useEffect(() => {
+    loadSavedCredentials();
+  }, []);
+
+  const loadSavedCredentials = async () => {
+    try {
+      const savedMatricula = await SecureStore.getItemAsync('saved_matricula');
+      const savedPassword = await SecureStore.getItemAsync('saved_password');
+      const shouldSave = await SecureStore.getItemAsync('save_password');
+      
+      if (savedMatricula) setMatricula(savedMatricula);
+      if (savedPassword) setPassword(savedPassword);
+      if (shouldSave === 'true') setSavePassword(true);
+    } catch (error) {
+      // Ignorar erros ao carregar credenciais salvas
+    }
+  };
+
+  const saveCredentials = async () => {
+    try {
+      if (savePassword) {
+        await SecureStore.setItemAsync('saved_matricula', matricula);
+        await SecureStore.setItemAsync('saved_password', password);
+        await SecureStore.setItemAsync('save_password', 'true');
+      } else {
+        await SecureStore.deleteItemAsync('saved_matricula');
+        await SecureStore.deleteItemAsync('saved_password');
+        await SecureStore.deleteItemAsync('save_password');
+      }
+    } catch (error) {
+      // Ignorar erros ao salvar credenciais
+    }
+  };
 
   const validate = () => {
     const validationErrors: typeof errors = {};
@@ -47,6 +85,9 @@ export default function LoginScreen() {
         username: matricula.trim(),
         password,
       });
+
+      // Salvar credenciais se solicitado
+      await saveCredentials();
 
       setMatricula('');
       setPassword('');
@@ -131,6 +172,18 @@ export default function LoginScreen() {
               returnKeyType="done"
             />
 
+            {/* Checkbox para salvar senha */}
+            <TouchableOpacity 
+              style={styles.savePasswordContainer}
+              onPress={() => setSavePassword(!savePassword)}
+              activeOpacity={0.7}
+            >
+              <View style={[styles.checkbox, savePassword && styles.checkboxChecked]}>
+                {savePassword && <Ionicons name="checkmark" size={16} color="#fff" />}
+              </View>
+              <Text style={styles.savePasswordText}>Salvar senha</Text>
+            </TouchableOpacity>
+
             <AuthButton
               title="Entrar"
               onPress={handleLogin}
@@ -201,6 +254,31 @@ const styles = StyleSheet.create({
   forgotText: {
     color: '#226BFF',
     fontWeight: '600',
+  },
+  savePasswordContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 20,
+    paddingHorizontal: 8,
+  },
+  checkbox: {
+    width: 20,
+    height: 20,
+    borderRadius: 4,
+    borderWidth: 2,
+    borderColor: '#226BFF',
+    marginRight: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#fff',
+  },
+  checkboxChecked: {
+    backgroundColor: '#226BFF',
+  },
+  savePasswordText: {
+    fontSize: 16,
+    color: '#1b1d29',
+    fontWeight: '500',
   },
   primaryButton: {
     marginBottom: 28,
