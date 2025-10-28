@@ -170,21 +170,21 @@ export default function LoginScreen() {
               errorMessage={errors.password}
               onSubmitEditing={handleLogin}
               returnKeyType="done"
-            />
+             />
 
-            {/* Checkbox para salvar senha */}
-            <TouchableOpacity 
-              style={styles.savePasswordContainer}
-              onPress={() => setSavePassword(!savePassword)}
-              activeOpacity={0.7}
-            >
-              <View style={[styles.checkbox, savePassword && styles.checkboxChecked]}>
-                {savePassword && <Ionicons name="checkmark" size={16} color="#fff" />}
-              </View>
-              <Text style={styles.savePasswordText}>Salvar senha</Text>
-            </TouchableOpacity>
+             {/* Checkbox para salvar senha */}
+             <TouchableOpacity 
+               style={styles.savePasswordContainer}
+               onPress={() => setSavePassword(!savePassword)}
+               activeOpacity={0.7}
+             >
+               <View style={[styles.checkbox, savePassword && styles.checkboxChecked]}>
+                 {savePassword && <Ionicons name="checkmark" size={16} color="#fff" />}
+               </View>
+               <Text style={styles.savePasswordText}>Salvar senha</Text>
+             </TouchableOpacity>
 
-            <AuthButton
+             <AuthButton
               title="Entrar"
               onPress={handleLogin}
               loading={loading}
@@ -251,36 +251,36 @@ const styles = StyleSheet.create({
     marginTop: 8,
     marginBottom: 32,
   },
-  forgotText: {
-    color: '#226BFF',
-    fontWeight: '600',
-  },
-  savePasswordContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 20,
-    paddingHorizontal: 8,
-  },
-  checkbox: {
-    width: 20,
-    height: 20,
-    borderRadius: 4,
-    borderWidth: 2,
-    borderColor: '#226BFF',
-    marginRight: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#fff',
-  },
-  checkboxChecked: {
-    backgroundColor: '#226BFF',
-  },
-  savePasswordText: {
-    fontSize: 16,
-    color: '#1b1d29',
-    fontWeight: '500',
-  },
-  primaryButton: {
+   forgotText: {
+     color: '#226BFF',
+     fontWeight: '600',
+   },
+   savePasswordContainer: {
+     flexDirection: 'row',
+     alignItems: 'center',
+     marginBottom: 20,
+     paddingHorizontal: 8,
+   },
+   checkbox: {
+     width: 20,
+     height: 20,
+     borderRadius: 4,
+     borderWidth: 2,
+     borderColor: '#226BFF',
+     marginRight: 12,
+     alignItems: 'center',
+     justifyContent: 'center',
+     backgroundColor: '#fff',
+   },
+   checkboxChecked: {
+     backgroundColor: '#226BFF',
+   },
+   savePasswordText: {
+     fontSize: 16,
+     color: '#1b1d29',
+     fontWeight: '500',
+   },
+   primaryButton: {
     marginBottom: 28,
   },
   footer: {
