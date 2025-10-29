@@ -91,7 +91,7 @@ export default function LoginScreen() {
 
       setLogin('');
       setPassword('');
-      router.replace('/(payment)' as any);
+      router.replace('/(tabs)' as any);
     } catch (error: any) {
       const detail = error?.data?.detail || error?.message || '';
       

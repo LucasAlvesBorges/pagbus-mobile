@@ -11,8 +11,8 @@ export default function PaymentSuccessScreen() {
   const { tariffName, tariffValue, transactionId, busLineId, busLineName, busLineCode, vehiclePrefix } = params;
 
   const handleBackToHome = () => {
-    // Voltar para payment/index (vai carregar a seleção salva do SecureStore)
-    router.replace('/(payment)' as any);
+    // Voltar para tabs que mostra payment/index (vai carregar a seleção salva do SecureStore)
+    router.replace('/(tabs)' as any);
   };
 
   return (

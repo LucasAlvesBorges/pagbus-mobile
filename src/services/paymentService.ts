@@ -118,6 +118,18 @@ class PaymentService {
       throw error;
     }
   }
+
+  /**
+   * Busca o histórico de transações do usuário logado
+   */
+  async getUserTransactionHistory() {
+    try {
+      const response = await apiService.get(`${this.baseUrl}/history/`);
+      return response;
+    } catch (error) {
+      throw error;
+    }
+  }
 }
 
 // Exportar instância singleton

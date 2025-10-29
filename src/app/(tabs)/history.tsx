@@ -13,20 +13,15 @@ import {
 } from 'react-native';
 import { paymentService } from '../../services/paymentService';
 import { formatCurrencyWithSymbol } from '../../utils/currency';
-import { authService } from '../../services/authService';
 import { formatDateToBrasilia } from '../../utils/date';
 
 interface Transaction {
   id: string;
-  payment_status: string;
   created_at: string;
-  updated_at: string;
-  transaction_history?: {
-    linha?: string;
-    veiculo?: string;
-    quantidade?: number;
-    valor_total?: string;
-  };
+  linha?: string;
+  veiculo?: string;
+  quantidade?: number;
+  valor_total?: string;
 }
 
 export default function HistoryScreen() {
@@ -42,28 +37,14 @@ export default function HistoryScreen() {
   const loadTransactions = async () => {
     try {
       setLoading(true);
-      const userId = await authService.getStoredUserId();
       
-      // Buscar todas as transações
-      const data = await paymentService.listTransactions();
+      // Buscar histórico do usuário logado
+      const data = await paymentService.getUserTransactionHistory();
       
-      // Filtrar por usuário se necessário
-      let filteredTransactions = Array.isArray(data) ? data : [];
+      // O endpoint retorna um array de TransactionHistory
+      const transactionsList = Array.isArray(data) ? data : [];
       
-      if (userId) {
-        filteredTransactions = filteredTransactions.filter((tx: any) => 
-          tx.user_id === userId || tx.transaction_history?.user_id === userId
-        );
-      }
-      
-      // Ordenar por data mais recente
-      filteredTransactions.sort((a: Transaction, b: Transaction) => {
-        const dateA = new Date(a.created_at).getTime();
-        const dateB = new Date(b.created_at).getTime();
-        return dateB - dateA;
-      });
-      
-      setTransactions(filteredTransactions);
+      setTransactions(transactionsList);
     } catch (error: any) {
       // Não mostrar erro, apenas deixar vazio
       setTransactions([]);
@@ -78,37 +59,6 @@ export default function HistoryScreen() {
     loadTransactions();
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status?.toLowerCase()) {
-      case 'aprovado':
-      case 'approved':
-        return '#4CAF50';
-      case 'pendente':
-      case 'pending':
-        return '#FF9800';
-      case 'cancelado':
-      case 'cancelled':
-        return '#F44336';
-      default:
-        return '#66708c';
-    }
-  };
-
-  const getStatusLabel = (status: string) => {
-    switch (status?.toLowerCase()) {
-      case 'aprovado':
-      case 'approved':
-        return 'Aprovado';
-      case 'pendente':
-      case 'pending':
-        return 'Pendente';
-      case 'cancelado':
-      case 'cancelled':
-        return 'Cancelado';
-      default:
-        return status || 'Desconhecido';
-    }
-  };
 
   const formatDate = (dateString: string) => {
     return formatDateToBrasilia(dateString);
@@ -135,34 +85,26 @@ export default function HistoryScreen() {
 
       {/* Header */}
       <View style={styles.header}>
-        <View style={styles.headerContent}>
-           <View style={styles.headerIcon}>
-             <Ionicons name="time" size={28} color="#fff" />
-           </View>
-          <View style={styles.headerTextContainer}>
-            <Text style={styles.headerTitle}>Histórico</Text>
-            <Text style={styles.headerSubtitle}>Suas transações recentes</Text>
-          </View>
-        </View>
+        <Text style={styles.headerTitle}>Histórico</Text>
       </View>
 
       {/* Content */}
       <View style={styles.content}>
         {loading ? (
           <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#226BFF" />
+            <ActivityIndicator size="large" color="#27C992" />
             <Text style={styles.loadingText}>Carregando histórico...</Text>
           </View>
         ) : transactions.length === 0 ? (
           <View style={styles.emptyContainer}>
-            <Ionicons name="receipt-outline" size={64} color="#cbd5e1" />
+            <Ionicons name="receipt-outline" size={64} color="#A5DCC6" />
             <Text style={styles.emptyTitle}>Nenhuma transação encontrada</Text>
             <Text style={styles.emptySubtitle}>
               Suas transações aparecerão aqui
             </Text>
             <TouchableOpacity
               style={styles.emptyButton}
-              onPress={() => router.push('/payment/select-busline')}
+              onPress={() => router.push('/(tabs)/index' as any)}
             >
               <Text style={styles.emptyButtonText}>Fazer primeiro pagamento</Text>
             </TouchableOpacity>
@@ -178,51 +120,36 @@ export default function HistoryScreen() {
               <View style={styles.transactionHeader}>
                 <View style={styles.transactionInfo}>
                   <Text style={styles.transactionTitle}>
-                    {transaction.transaction_history?.linha || 'Transação'}
+                    {transaction.linha || 'Transação'}
                   </Text>
-                  {transaction.transaction_history?.veiculo && (
+                  {transaction.veiculo && (
                     <Text style={styles.transactionSubtitle}>
-                      Veículo: {transaction.transaction_history.veiculo}
+                      Veículo: {transaction.veiculo}
                     </Text>
                   )}
                 </View>
-                <View
-                  style={[
-                    styles.statusBadge,
-                    { backgroundColor: getStatusColor(transaction.payment_status) + '20' },
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.statusText,
-                      { color: getStatusColor(transaction.payment_status) },
-                    ]}
-                  >
-                    {getStatusLabel(transaction.payment_status)}
+                {transaction.valor_total && (
+                  <Text style={styles.amountValue}>
+                    {formatCurrencyWithSymbol(transaction.valor_total)}
                   </Text>
-                </View>
+                )}
               </View>
 
-              {transaction.transaction_history?.valor_total && (
-                <View style={styles.transactionAmount}>
-                  <Text style={styles.amountLabel}>Valor:</Text>
-                  <Text style={styles.amountValue}>
-                    {formatCurrencyWithSymbol(transaction.transaction_history.valor_total)}
+              <View style={styles.transactionDetails}>
+                {transaction.quantidade && (
+                  <View style={styles.detailItem}>
+                    <Ionicons name="receipt-outline" size={16} color="#A5DCC6" />
+                    <Text style={styles.detailText}>
+                      {transaction.quantidade}x Passagem
+                    </Text>
+                  </View>
+                )}
+                <View style={styles.detailItem}>
+                  <Ionicons name="calendar-outline" size={16} color="#A5DCC6" />
+                  <Text style={styles.detailText}>
+                    {formatDate(transaction.created_at)}
                   </Text>
                 </View>
-              )}
-
-              {transaction.transaction_history?.quantidade && (
-                <Text style={styles.transactionQuantity}>
-                  {transaction.transaction_history.quantidade}x Passagem
-                </Text>
-              )}
-
-              <View style={styles.transactionFooter}>
-                <Ionicons name="calendar-outline" size={14} color="#66708c" />
-                <Text style={styles.transactionDate}>
-                  {formatDate(transaction.created_at)}
-                </Text>
               </View>
             </TouchableOpacity>
           ))
@@ -240,34 +167,14 @@ const styles = StyleSheet.create({
   header: {
     backgroundColor: '#122017',
     paddingTop: 50,
-    paddingBottom: 24,
+    paddingBottom: 20,
     paddingHorizontal: 24,
   },
-  headerContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  headerIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: '#ffffff20',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 16,
-  },
-  headerTextContainer: {
-    flex: 1,
-  },
   headerTitle: {
-    fontSize: 28,
-    fontWeight: '700',
+    fontSize: 20,
+    fontWeight: '600',
     color: '#fff',
-    marginBottom: 4,
-  },
-  headerSubtitle: {
-    fontSize: 14,
-    color: '#fff',
+    textAlign: 'center',
   },
   content: {
     padding: 24,
@@ -282,7 +189,7 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 16,
     fontSize: 16,
-    color: '#66708c',
+    color: '#A5DCC6',
   },
   emptyContainer: {
     padding: 48,
@@ -292,21 +199,26 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: 20,
     fontWeight: '700',
-    color: '#1b1d29',
+    color: '#fff',
     marginTop: 24,
     marginBottom: 8,
   },
   emptySubtitle: {
     fontSize: 14,
-    color: '#66708c',
+    color: '#A5DCC6',
     textAlign: 'center',
     marginBottom: 32,
   },
   emptyButton: {
-    backgroundColor: '#226BFF',
+    backgroundColor: '#27C992',
     paddingVertical: 12,
     paddingHorizontal: 24,
-    borderRadius: 8,
+    borderRadius: 12,
+    shadowColor: '#27C992',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
   },
   emptyButtonText: {
     color: '#fff',
@@ -314,15 +226,17 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   transactionCard: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 16,
+    backgroundColor: '#111C20',
+    borderRadius: 10,
+    padding: 12,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.15,
+    shadowRadius: 3,
     elevation: 2,
-    gap: 12,
+    gap: 8,
+    borderWidth: 1,
+    borderColor: '#27C99220',
   },
   transactionHeader: {
     flexDirection: 'row',
@@ -331,59 +245,39 @@ const styles = StyleSheet.create({
   },
   transactionInfo: {
     flex: 1,
-    marginRight: 12,
+    marginRight: 8,
   },
   transactionTitle: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '600',
-    color: '#1b1d29',
-    marginBottom: 4,
+    color: '#fff',
+    marginBottom: 2,
   },
   transactionSubtitle: {
-    fontSize: 14,
-    color: '#66708c',
-  },
-  statusBadge: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 12,
-  },
-  statusText: {
     fontSize: 12,
-    fontWeight: '600',
-  },
-  transactionAmount: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingTop: 8,
-    borderTopWidth: 1,
-    borderTopColor: '#e2e8f0',
-  },
-  amountLabel: {
-    fontSize: 14,
-    color: '#66708c',
+    color: '#A5DCC6',
   },
   amountValue: {
-    fontSize: 18,
+    fontSize: 15,
     fontWeight: '700',
-    color: '#226BFF',
+    color: '#27C992',
   },
-  transactionQuantity: {
-    fontSize: 14,
-    color: '#66708c',
+  transactionDetails: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    paddingTop: 6,
+    borderTopWidth: 1,
+    borderTopColor: '#27C99230',
   },
-  transactionFooter: {
+  detailItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    paddingTop: 8,
-    borderTopWidth: 1,
-    borderTopColor: '#e2e8f0',
+    gap: 5,
   },
-  transactionDate: {
-    fontSize: 12,
-    color: '#66708c',
+  detailText: {
+    fontSize: 11,
+    color: '#A5DCC6',
   },
 });
 

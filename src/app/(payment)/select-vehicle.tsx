@@ -63,8 +63,8 @@ export default function SelectVehicleScreen() {
         vehiclePrefix: vehicle.prefix,
       });
       
-      // Voltar para payment/index (vai carregar do SecureStore)
-      router.replace('/(payment)' as any);
+      // Voltar para tabs que mostra payment/index (vai carregar do SecureStore)
+      router.replace('/(tabs)' as any);
     } catch (error) {
       Alert.alert('Erro', 'Não foi possível salvar a seleção');
     }
