@@ -1,35 +1,18 @@
 import { StyleSheet, Text, View, TouchableOpacity, ScrollView } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter, Link } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { formatCurrencyWithSymbol } from '../../utils/currency';
+import { getCurrentBrasiliaDateTime } from '../../utils/date';
 
 export default function PaymentSuccessScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
   const { tariffName, tariffValue, transactionId, busLineId, busLineName, busLineCode, vehiclePrefix } = params;
 
-  const handleBackToTariffs = () => {
-    // Se tiver informações de linha e veículo, voltar para tela de tarifas
-    if (busLineId && vehiclePrefix) {
-      router.push({
-        pathname: '/payment',
-        params: {
-          busLineId: busLineId as string,
-          busLineName: busLineName as string,
-          busLineCode: busLineCode as string,
-          vehiclePrefix: vehiclePrefix as string,
-        },
-      });
-    } else {
-      // Caso contrário, voltar para início da seleção
-      router.push('/payment/select-busline');
-    }
-  };
-
-  const handlePayAgain = () => {
-    // Sempre reiniciar do início quando pagar novamente
-    router.push('/payment/select-busline');
+  const handleBackToHome = () => {
+    // Voltar para payment/index (vai carregar a seleção salva do SecureStore)
+    router.replace('/(payment)' as any);
   };
 
   return (
@@ -40,7 +23,7 @@ export default function PaymentSuccessScreen() {
         {/* Ícone de sucesso animado */}
         <View style={styles.iconContainer}>
           <View style={styles.iconCircle}>
-            <Ionicons name="checkmark-circle" size={120} color="#4CAF50" />
+            <Ionicons name="checkmark-circle" size={120} color="#27C992" />
           </View>
         </View>
 
@@ -51,7 +34,7 @@ export default function PaymentSuccessScreen() {
         {/* Card com informações */}
         <View style={styles.infoCard}>
           <View style={styles.infoRow}>
-            <Ionicons name="cash-outline" size={24} color="#007AFF" />
+            <Ionicons name="cash-outline" size={24} color="#27C992" />
             <View style={styles.infoTextContainer}>
               <Text style={styles.infoLabel}>Valor Pago</Text>
               <Text style={styles.infoValue}>{formatCurrencyWithSymbol(Array.isArray(tariffValue) ? tariffValue[0] : tariffValue)}</Text>
@@ -61,11 +44,11 @@ export default function PaymentSuccessScreen() {
           <View style={styles.divider} />
 
           <View style={styles.infoRow}>
-            <Ionicons name="calendar-outline" size={24} color="#007AFF" />
+            <Ionicons name="calendar-outline" size={24} color="#27C992" />
             <View style={styles.infoTextContainer}>
               <Text style={styles.infoLabel}>Data/Hora</Text>
               <Text style={styles.infoValue}>
-                {new Date().toLocaleDateString('pt-BR')} às {new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                {getCurrentBrasiliaDateTime()}
               </Text>
             </View>
           </View>
@@ -74,7 +57,7 @@ export default function PaymentSuccessScreen() {
             <>
               <View style={styles.divider} />
               <View style={styles.infoRow}>
-                <Ionicons name="key-outline" size={24} color="#666" />
+                <Ionicons name="key-outline" size={24} color="#27C992" />
                 <View style={styles.infoTextContainer}>
                   <Text style={styles.infoLabel}>ID da Transação</Text>
                   <Text style={styles.infoValueSmall}>{transactionId}</Text>
@@ -88,10 +71,10 @@ export default function PaymentSuccessScreen() {
         <View style={styles.buttonContainer}>
           <TouchableOpacity
             style={styles.primaryButton}
-            onPress={handleBackToTariffs}
+            onPress={handleBackToHome}
           >
             <Ionicons name="home" size={20} color="#fff" />
-            <Text style={styles.primaryButtonText}>Voltar</Text>
+            <Text style={styles.primaryButtonText}>Voltar ao Início</Text>
           </TouchableOpacity>
 
         </View>
@@ -103,7 +86,7 @@ export default function PaymentSuccessScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#122017',
   },
   content: {
     flex: 1,
@@ -120,38 +103,28 @@ const styles = StyleSheet.create({
     width: 180,
     height: 180,
     borderRadius: 90,
-    backgroundColor: '#E8F5E9',
+    backgroundColor: '#111C20',
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#4CAF50',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 5,
   },
   title: {
     fontSize: 32,
     fontWeight: 'bold',
-    color: '#1a1a1a',
+    color: '#fff',
     marginBottom: 8,
     textAlign: 'center',
   },
   subtitle: {
     fontSize: 16,
-    color: '#666',
+    color: '#fff',
     textAlign: 'center',
     marginBottom: 32,
   },
   infoCard: {
-    backgroundColor: '#fff',
+    backgroundColor: '#111C20',
     borderRadius: 16,
     padding: 20,
     width: '100%',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
     marginBottom: 24,
   },
   infoRow: {
@@ -165,22 +138,22 @@ const styles = StyleSheet.create({
   },
   infoLabel: {
     fontSize: 12,
-    color: '#666',
+    color: '#fff',
     marginBottom: 4,
   },
   infoValue: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#1a1a1a',
+    color: '#fff',
   },
   infoValueSmall: {
     fontSize: 12,
     fontWeight: '500',
-    color: '#666',
+    color: '#fff',
   },
   divider: {
     height: 1,
-    backgroundColor: '#e0e0e0',
+    backgroundColor: '#122017',
   },
   messageBox: {
     backgroundColor: '#E8F5E9',
@@ -206,7 +179,7 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   primaryButton: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#27C992',
     paddingVertical: 16,
     paddingHorizontal: 24,
     borderRadius: 12,
@@ -214,11 +187,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    shadowColor: '#4CAF50',
+    shadowColor: '#27C992',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
-    elevation: 5,
+    elevation: 8,
   },
   primaryButtonText: {
     color: '#fff',
@@ -226,7 +199,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   secondaryButton: {
-    backgroundColor: '#fff',
+    backgroundColor: '#111C20',
     paddingVertical: 16,
     paddingHorizontal: 24,
     borderRadius: 12,
@@ -235,10 +208,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 8,
     borderWidth: 2,
-    borderColor: '#007AFF',
+    borderColor: '#27C992',
   },
   secondaryButtonText: {
-    color: '#007AFF',
+    color: '#27C992',
     fontSize: 16,
     fontWeight: '600',
   },
@@ -248,7 +221,7 @@ const styles = StyleSheet.create({
   },
   footerText: {
     fontSize: 14,
-    color: '#666',
+    color: '#fff',
     textAlign: 'center',
   },
 });

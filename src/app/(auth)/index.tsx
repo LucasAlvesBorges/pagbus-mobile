@@ -18,9 +18,9 @@ import { authService } from '../../services/authService';
 
 export default function LoginScreen() {
   const router = useRouter();
-  const [matricula, setMatricula] = useState('araujo.pagbus');
+  const [login, setLogin] = useState('araujo.pagbus');
   const [password, setPassword] = useState('4705');
-  const [errors, setErrors] = useState<{ matricula?: string; password?: string }>({});
+  const [errors, setErrors] = useState<{ login?: string; password?: string }>({});
   const [loading, setLoading] = useState(false);
   const [savePassword, setSavePassword] = useState(false);
 
@@ -31,11 +31,11 @@ export default function LoginScreen() {
 
   const loadSavedCredentials = async () => {
     try {
-      const savedMatricula = await SecureStore.getItemAsync('saved_matricula');
+      const savedLogin = await SecureStore.getItemAsync('saved_login');
       const savedPassword = await SecureStore.getItemAsync('saved_password');
       const shouldSave = await SecureStore.getItemAsync('save_password');
       
-      if (savedMatricula) setMatricula(savedMatricula);
+      if (savedLogin) setLogin(savedLogin);
       if (savedPassword) setPassword(savedPassword);
       if (shouldSave === 'true') setSavePassword(true);
     } catch (error) {
@@ -46,11 +46,11 @@ export default function LoginScreen() {
   const saveCredentials = async () => {
     try {
       if (savePassword) {
-        await SecureStore.setItemAsync('saved_matricula', matricula);
+        await SecureStore.setItemAsync('saved_login', login);
         await SecureStore.setItemAsync('saved_password', password);
         await SecureStore.setItemAsync('save_password', 'true');
       } else {
-        await SecureStore.deleteItemAsync('saved_matricula');
+        await SecureStore.deleteItemAsync('saved_login');
         await SecureStore.deleteItemAsync('saved_password');
         await SecureStore.deleteItemAsync('save_password');
       }
@@ -62,8 +62,8 @@ export default function LoginScreen() {
   const validate = () => {
     const validationErrors: typeof errors = {};
 
-    if (!matricula.trim()) {
-      validationErrors.matricula = 'Informe sua matrícula.';
+    if (!login.trim()) {
+      validationErrors.login = 'Informe seu login.';
     }
 
     if (!password.trim()) {
@@ -82,23 +82,23 @@ export default function LoginScreen() {
     try {
       setLoading(true);
       await authService.login({
-        username: matricula.trim(),
+        username: login.trim(),
         password,
       });
 
       // Salvar credenciais se solicitado
       await saveCredentials();
 
-      setMatricula('');
+      setLogin('');
       setPassword('');
-      router.replace('/payment/select-busline');
+      router.replace('/(payment)' as any);
     } catch (error: any) {
       const detail = error?.data?.detail || error?.message || '';
       
       // Verificar tipo específico de erro do backend
       if (detail === 'User not found.') {
         setErrors({
-          matricula: 'Usuário não encontrado',
+          login: 'Usuário não encontrado',
         });
       } else if (detail === 'Invalid password.') {
         setErrors({
@@ -107,13 +107,13 @@ export default function LoginScreen() {
       } else if (detail.toLowerCase().includes('invalid credentials')) {
         // Fallback para outros tipos de erro de credenciais
         setErrors({
-          matricula: 'Matrícula ou senha incorretos',
-          password: 'Matrícula ou senha incorretos',
+          login: 'Login ou senha incorretos',
+          password: 'Login ou senha incorretos',
         });
       } else {
         // Erro genérico
         setErrors({
-          matricula: 'Erro ao fazer login',
+          login: 'Erro ao fazer login',
         });
       }
     } finally {
@@ -137,22 +137,24 @@ export default function LoginScreen() {
             </View>
           </View>
 
-          <Text style={styles.title}>PagBus{'\n'}Bem-vindo!</Text>
+          <Text style={styles.title}>Acesso do Operador</Text>
+          <Text style={styles.subtitle}>Bem-vindo! Faça seu login para continuar.</Text>
 
           <View style={styles.form}>
             <AuthTextInput
-              label="Matrícula"
+              label="Login"
               autoCapitalize="none"
-              placeholder="Digite sua matrícula"
-              value={matricula}
+              placeholder="Digite seu login"
+              value={login}
               onChangeText={(value) => {
-                setErrors((prev) => ({ ...prev, matricula: undefined }));
-                setMatricula(value);
+                setErrors((prev) => ({ ...prev, login: undefined }));
+                setLogin(value);
               }}
               keyboardType="default"
               containerStyle={styles.fieldSpacing}
-              errorMessage={errors.matricula}
+              errorMessage={errors.login}
               returnKeyType="next"
+              showUserIcon={true}
             />
 
             <AuthTextInput
@@ -188,7 +190,7 @@ export default function LoginScreen() {
               title="Entrar"
               onPress={handleLogin}
               loading={loading}
-              disabled={!matricula.trim() || !password.trim()}
+              disabled={!login.trim() || !password.trim()}
               style={styles.primaryButton}
             />
 
@@ -206,7 +208,7 @@ const styles = StyleSheet.create({
   },
   container: {
     flex: 1,
-    backgroundColor: '#dfe6f5',
+    backgroundColor: '#122017',
     padding: 24,
   },
   content: {
@@ -222,10 +224,10 @@ const styles = StyleSheet.create({
     width: 120,
     height: 120,
     borderRadius: 60,
-    backgroundColor: '#226BFF',
+    backgroundColor: '#27C992',
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#226BFF',
+    shadowColor: '#27C992',
     shadowOffset: { width: 0, height: 12 },
     shadowOpacity: 0.35,
     shadowRadius: 20,
@@ -234,10 +236,17 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 32,
     fontWeight: '700',
-    color: '#1b1d29',
+    color: '#fff',
+    textAlign: 'center',
+    marginBottom: 8,
+    lineHeight: 38,
+  },
+  subtitle: {
+    fontSize: 16,
+    fontWeight: '400',
+    color: '#A5DCC6',
     textAlign: 'center',
     marginBottom: 28,
-    lineHeight: 38,
   },
   form: {
     width: '100%',
@@ -252,7 +261,7 @@ const styles = StyleSheet.create({
     marginBottom: 32,
   },
    forgotText: {
-     color: '#226BFF',
+     color: '#27C992',
      fontWeight: '600',
    },
    savePasswordContainer: {
@@ -266,18 +275,18 @@ const styles = StyleSheet.create({
      height: 20,
      borderRadius: 4,
      borderWidth: 2,
-     borderColor: '#226BFF',
+     borderColor: '#27C992',
      marginRight: 12,
      alignItems: 'center',
      justifyContent: 'center',
-     backgroundColor: '#fff',
+     backgroundColor: '#122017',
    },
    checkboxChecked: {
-     backgroundColor: '#226BFF',
+     backgroundColor: '#27C992',
    },
    savePasswordText: {
      fontSize: 16,
-     color: '#1b1d29',
+     color: '#fff',
      fontWeight: '500',
    },
    primaryButton: {

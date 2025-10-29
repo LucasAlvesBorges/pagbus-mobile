@@ -16,6 +16,7 @@ interface AuthTextInputProps extends TextInputProps {
   containerStyle?: StyleProp<ViewStyle>;
   errorMessage?: string;
   enablePasswordToggle?: boolean;
+  showUserIcon?: boolean;
 }
 
 export function AuthTextInput({
@@ -25,6 +26,7 @@ export function AuthTextInput({
   errorMessage,
   secureTextEntry,
   enablePasswordToggle = false,
+  showUserIcon = false,
   ...rest
 }: AuthTextInputProps) {
   const [isSecure, setIsSecure] = useState(!!secureTextEntry);
@@ -43,14 +45,29 @@ export function AuthTextInput({
       <View style={[styles.inputWrapper, hasError && styles.inputWrapperError]}>
         <TextInput
           {...rest}
-          style={[styles.input, hasError && styles.inputError, style]}
-          placeholderTextColor="#90A4C8"
+          style={[
+            styles.input, 
+            hasError && styles.inputError,
+            (enablePasswordToggle || showUserIcon) && styles.inputWithIcon,
+            style
+          ]}
+          placeholderTextColor="#A5DCC6"
           secureTextEntry={isSecure}
         />
 
+        {showUserIcon && !enablePasswordToggle && (
+          <View style={styles.iconContainer}>
+            <Ionicons name="person-outline" size={22} color="#27C992" />
+          </View>
+        )}
+
         {enablePasswordToggle && (
-          <TouchableOpacity style={styles.iconButton} onPress={toggleSecureTextEntry} activeOpacity={0.7}>
-            <Ionicons name={isSecure ? 'eye-off-outline' : 'eye-outline'} size={22} color="#4A6BF2" />
+          <TouchableOpacity 
+            style={styles.iconContainer} 
+            onPress={toggleSecureTextEntry} 
+            activeOpacity={0.7}
+          >
+            <Ionicons name={isSecure ? 'eye-off-outline' : 'eye-outline'} size={22} color="#27C992" />
           </TouchableOpacity>
         )}
       </View>
@@ -64,39 +81,46 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#1b1d29',
+    color: '#fff',
     marginBottom: 8,
   },
   inputWrapper: {
     position: 'relative',
   },
   input: {
-    backgroundColor: '#e9f1ff',
-    borderRadius: 18,
-    paddingHorizontal: 18,
-    paddingVertical: 16,
+    backgroundColor: '#111C20',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
     fontSize: 16,
-    color: '#1b1d29',
+    color: '#fff',
+    borderWidth: 1,
+    borderColor: '#27C992',
   },
-  iconButton: {
+  inputWithIcon: {
+    paddingRight: 48,
+  },
+  iconContainer: {
     position: 'absolute',
     right: 16,
-    top: '50%',
-    transform: [{ translateY: -11 }],
-    padding: 4,
+    top: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 4,
   },
   inputWrapperError: {
     borderWidth: 2,
-    borderColor: '#FF3B30',
-    borderRadius: 18,
+    borderColor: '#FF6B6B',
+    borderRadius: 12,
   },
   inputError: {
-    backgroundColor: '#FFF5F5',
-    color: '#FF3B30',
+    backgroundColor: '#111C20',
+    color: '#FF6B6B',
   },
   errorText: {
     marginTop: 6,
-    color: '#FF3B30',
+    color: '#FF6B6B',
     fontSize: 13,
     fontWeight: '500',
   },

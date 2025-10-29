@@ -1,64 +1,79 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View, ActivityIndicator } from 'react-native';
 import { API_URL } from '../../config/env';
 import { PaymentRequest, paymentService } from '../../services/paymentService';
 import { buslineService, Tariff } from '../../services/buslineService';
 import { authService } from '../../services/authService';
+import { selectionService, BusSelection } from '../../services/selectionService';
 import { formatCurrency, formatCurrencyWithSymbol } from '../../utils/currency';
 
 export default function PaymentScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
-  const { busLineId, busLineName, busLineCode, vehiclePrefix } = params;
-  
-  console.log('🔍 PaymentScreen renderizado com params:', params);
   
   const [quantity, setQuantity] = useState(1);
   const [tariffs, setTariffs] = useState<Tariff[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [selectedTariff, setSelectedTariff] = useState<Tariff | null>(null);
+  const [selection, setSelection] = useState<BusSelection | null>(null);
 
-  // Redirecionar se não houver linha selecionada
-  useEffect(() => {
-    console.log('📋 Parâmetros recebidos:', { busLineId, busLineName, busLineCode, vehiclePrefix });
-    
-    const hasBusLine = busLineId || busLineName;
-    
-    if (!hasBusLine) {
-      console.log('⚠️ Sem linha selecionada, redirecionando...');
-      router.replace('/payment/select-busline');
-      return;
+  // Carregar seleção salva quando a tela ganhar foco
+  useFocusEffect(
+    useCallback(() => {
+      loadSavedSelection();
+    }, [])
+  );
+
+  const loadSavedSelection = async () => {
+    try {
+      // Primeiro tentar carregar dos parâmetros (quando vem da navegação)
+      if (params.busLineId && params.busLineName && params.busLineCode && params.vehiclePrefix) {
+        const newSelection: BusSelection = {
+          busLineId: params.busLineId as string,
+          busLineName: params.busLineName as string,
+          busLineCode: params.busLineCode as string,
+          busLineCompany: params.busLineCompany as string || '1',
+          vehiclePrefix: params.vehiclePrefix as string,
+        };
+        setSelection(newSelection);
+        await selectionService.saveSelection(newSelection);
+        await loadTariffs(newSelection.busLineId);
+        return;
+      }
+
+      // Caso contrário, carregar do SecureStore
+      const savedSelection = await selectionService.loadSelection();
+      if (savedSelection) {
+        setSelection(savedSelection);
+        await loadTariffs(savedSelection.busLineId);
+      } else {
+        setSelection(null);
+      }
+    } catch (error) {
+      // Erro silencioso
     }
-    
-    console.log('✅ Carregando tarifas...');
-    loadTariffs();
-  }, [busLineId, busLineName, busLineCode, vehiclePrefix]);
+  };
 
-  const loadTariffs = async () => {
-    if (!busLineId) return;
+  const loadTariffs = async (lineId: string) => {
+    if (!lineId) return;
     
     try {
       setLoading(true);
-      console.log('🔍 Buscando linha ID:', busLineId);
-      const lineData = await buslineService.getBusLineById(parseInt(busLineId as string));
-      console.log('📊 Dados da linha recebidos:', JSON.stringify(lineData, null, 2));
+      const lineData = await buslineService.getBusLineById(parseInt(lineId));
       
       // Usar as tarifas da linha
       if (lineData.tariffs && lineData.tariffs.length > 0) {
-        console.log('✅ Tarifas encontradas:', lineData.tariffs);
         setTariffs(lineData.tariffs);
         setSelectedTariff(lineData.tariffs[0]);
       } else {
-        console.log('⚠️ Nenhuma tarifa encontrada na linha');
         Alert.alert('Aviso', 'Esta linha não possui tarifas cadastradas');
         setTariffs([]);
         setSelectedTariff(null);
       }
     } catch (error: any) {
-      console.error('❌ Erro ao carregar tarifas da linha:', error);
       Alert.alert('Erro', 'Não foi possível carregar as tarifas desta linha');
       setTariffs([]);
       setSelectedTariff(null);
@@ -85,14 +100,16 @@ export default function PaymentScreen() {
       return;
     }
     try {
-      console.log('🌐 URL da API:', API_URL);
-      console.log('🗝️ Iniciando geração de pagamento para:', `Tarifa ${formatCurrencyWithSymbol(selectedTariff.value)}`);
+      if (!selection) {
+        Alert.alert('Aviso', 'Por favor, selecione uma linha e veículo.');
+        return;
+      }
 
       const tariffValue = parseFloat(selectedTariff.value);
       const totalAmount = tariffValue * quantity;
       
       // Extrair company_id do busLineCompany ou usar padrão
-      const companyId = params.busLineCompany ? parseInt(params.busLineCompany as string) : 1;
+      const companyId = parseInt(selection.busLineCompany) || 1;
       
       // Obter user_id do auth service
       const userId = await authService.getStoredUserId();
@@ -101,7 +118,7 @@ export default function PaymentScreen() {
         company_id: companyId,
         items: [
           {
-            title: `${quantity}x Tarifa ${formatCurrencyWithSymbol(selectedTariff.value)} - ${busLineName} (${busLineCode}) - ${vehiclePrefix}`,
+            title: `${quantity}x Tarifa ${formatCurrencyWithSymbol(selectedTariff.value)} - ${selection.busLineName} (${selection.busLineCode}) - ${selection.vehiclePrefix}`,
             quantity: quantity,
             unit_price: tariffValue,
             currency_id: 'BRL',
@@ -110,39 +127,29 @@ export default function PaymentScreen() {
         external_reference: `ref_${Date.now()}`,
         front_url: 'pagbusmobile://',
         // Dados adicionais para o histórico
-        bus_line_name: busLineName as string | undefined,
-        bus_line_id: busLineId as string | undefined,
-        vehicle_prefix: vehiclePrefix as string | undefined,
+        bus_line_name: selection.busLineName,
+        bus_line_id: selection.busLineId,
+        vehicle_prefix: selection.vehiclePrefix,
         user_id: userId || undefined,
       };
 
-      console.log('📤 Enviando requisição para API:', paymentData);
+      const response = await paymentService.createPayment(paymentData);
 
-            const response = await paymentService.createPayment(paymentData);
-
-            console.log('📥 Resposta da API:', response);
-
-            const qrCodeData = response.qr_code || response.transaction.pagamento_url;
-            const qrCodeBase64 = response.qr_code_base64;
-            const copyPaste = response.copy_paste || response.qr_code;
-            const pixLink = response.redirect_url || response.transaction.pagamento_url;
-            const transactionId = response.transaction.id.toString();
-
-      console.log('✅ QR Code gerado:', qrCodeData);
-      console.log('✅ QR Code Base64:', qrCodeBase64 ? 'Disponível' : 'Não disponível');
-      console.log('✅ Copy/Paste:', copyPaste);
-      console.log('✅ Link PIX:', pixLink);
-      console.log('✅ Transaction ID:', transactionId);
+      const qrCodeData = response.qr_code || response.transaction.pagamento_url;
+      const qrCodeBase64 = response.qr_code_base64;
+      const copyPaste = response.copy_paste || response.qr_code;
+      const pixLink = response.redirect_url || response.transaction.pagamento_url;
+      const transactionId = response.transaction.id.toString();
 
       router.push({
-        pathname: '/payment/payment-detail',
+        pathname: '/(payment)/payment-detail',
         params: {
           tariffName: `${quantity}x Tarifa ${formatCurrencyWithSymbol(selectedTariff.value)}`,
           tariffValue: totalAmount.toString(),
-          busLineId: busLineId as string,
-          busLineName: busLineName as string,
-          busLineCode: busLineCode as string,
-          vehiclePrefix: vehiclePrefix as string,
+          busLineId: selection.busLineId,
+          busLineName: selection.busLineName,
+          busLineCode: selection.busLineCode,
+          vehiclePrefix: selection.vehiclePrefix,
           qrCodeData: qrCodeData,
           qrCodeBase64: qrCodeBase64 || '',
           copyPaste: copyPaste,
@@ -151,8 +158,6 @@ export default function PaymentScreen() {
         },
       });
     } catch (error: any) {
-      console.error('❌ Erro ao gerar pagamento:', error);
-
       Alert.alert(
         'Erro ao conectar com o servidor',
         error?.message || 'Verifique se o backend está rodando e acessível.'
@@ -160,12 +165,33 @@ export default function PaymentScreen() {
     }
   };
 
-  const handleGoBack = () => {
-    router.back();
+  const handleSelectBusLine = () => {
+    router.push('/(payment)/select-busline');
   };
 
-  const handleStartOver = () => {
-    router.push('/payment/select-busline');
+  const handleLogout = async () => {
+    Alert.alert(
+      'Sair',
+      'Tem certeza que deseja sair da aplicação?',
+      [
+        {
+          text: 'Cancelar',
+          style: 'cancel',
+        },
+        {
+          text: 'Sair',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await authService.logout();
+              router.replace('/(auth)');
+            } catch (error) {
+              Alert.alert('Erro', 'Não foi possível fazer logout');
+            }
+          },
+        },
+      ]
+    );
   };
 
   return (
@@ -174,8 +200,8 @@ export default function PaymentScreen() {
 
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={handleGoBack} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color="#007AFF" />
+        <TouchableOpacity onPress={handleLogout} style={styles.logoutButton}>
+          <Ionicons name="log-out-outline" size={24} color="#fff" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Escolha a Tarifa</Text>
         <View style={styles.placeholder} />
@@ -183,19 +209,26 @@ export default function PaymentScreen() {
 
       <View style={styles.content}>
         {/* Informações da Linha */}
-        {(busLineName || vehiclePrefix) && (
+        {selection ? (
           <View style={styles.selectedInfoBox}>
-            <Ionicons name="checkmark-circle" size={24} color="#4CAF50" />
+            <Ionicons name="checkmark-circle" size={24} color="#27C992" />
             <View style={styles.selectedInfo}>
-              {busLineName && (
-                <Text style={styles.selectedText}>{busLineName}</Text>
-              )}
-              {vehiclePrefix && (
-                <Text style={styles.selectedSubText}>Veículo: {vehiclePrefix}</Text>
-              )}
+              <Text style={styles.selectedText}>{selection.busLineName}</Text>
+              <Text style={styles.selectedSubText}>Veículo: {selection.vehiclePrefix}</Text>
             </View>
-            <TouchableOpacity onPress={handleStartOver} style={styles.changeButton}>
+            <TouchableOpacity onPress={handleSelectBusLine} style={styles.changeButton}>
               <Text style={styles.changeButtonText}>Alterar</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <View style={styles.emptySelectionBox}>
+            <Ionicons name="bus-outline" size={32} color="#27C992" />
+            <View style={styles.emptySelectionInfo}>
+              <Text style={styles.emptySelectionText}>Nenhuma linha selecionada</Text>
+              <Text style={styles.emptySelectionSubText}>Selecione uma linha e veículo para continuar</Text>
+            </View>
+            <TouchableOpacity onPress={handleSelectBusLine} style={styles.selectButton}>
+              <Text style={styles.selectButtonText}>Selecionar</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -208,7 +241,13 @@ export default function PaymentScreen() {
               <Text style={styles.loadingText}>Carregando...</Text>
             </View>
           ) : tariffs.length === 0 ? (
-            <Text style={styles.emptyText}>Nenhuma tarifa disponível</Text>
+            <View style={styles.emptyTariffBox}>
+              <Ionicons name="cash-outline" size={32} color="#27C992" />
+              <View style={styles.emptyTariffInfo}>
+                <Text style={styles.emptyTariffText}>Nenhuma tarifa disponível</Text>
+                <Text style={styles.emptyTariffSubText}>Esta linha não possui tarifas cadastradas</Text>
+              </View>
+            </View>
           ) : (
             <View style={styles.tariffGrid}>
               {tariffs.map((tariff) => (
@@ -270,10 +309,10 @@ export default function PaymentScreen() {
         <TouchableOpacity
           style={[
             styles.generateQrCodeButton,
-            (!selectedTariff || loading) && styles.generateQrCodeButtonDisabled
+            (!selectedTariff || loading || !selection) && styles.generateQrCodeButtonDisabled
           ]}
           onPress={handleGenerateQRCode}
-          disabled={!selectedTariff || loading}
+          disabled={!selectedTariff || loading || !selection}
         >
           {loading ? (
             <View style={styles.buttonContent}>
@@ -292,7 +331,7 @@ export default function PaymentScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f6f7f8',
+    backgroundColor: '#122017',
   },
   header: {
     flexDirection: 'row',
@@ -300,19 +339,19 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingTop: 50,
     padding: 16,
-    paddingBottom: 8,
-    backgroundColor: '#f6f7f8',
+    paddingBottom: 16,
+    backgroundColor: '#122017',
   },
-  backButton: {
+  logoutButton: {
     padding: 8,
   },
   headerTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#1a1a1a',
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#fff',
     flex: 1,
     textAlign: 'center',
-    paddingRight: 48,
+    paddingRight: 8,
   },
   placeholder: {
     width: 40,
@@ -326,14 +365,9 @@ const styles = StyleSheet.create({
   selectedInfoBox: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#fff',
+    backgroundColor: '#111C20',
     padding: 16,
-    borderRadius: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 2,
+    borderRadius: 12,
     marginBottom: 16,
   },
   selectedInfo: {
@@ -343,38 +377,94 @@ const styles = StyleSheet.create({
   selectedText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#1a1a1a',
+    color: '#fff',
   },
   selectedSubText: {
     fontSize: 14,
-    color: '#666',
+    color: '#fff',
   },
   changeButton: {
     paddingVertical: 6,
     paddingHorizontal: 12,
     borderRadius: 6,
-    backgroundColor: '#e0e0e0',
+    backgroundColor: '#27C992',
   },
   changeButtonText: {
     fontSize: 14,
-    color: '#1a1a1a',
+    color: '#fff',
     fontWeight: '500',
   },
-  card: {
-    backgroundColor: '#fff',
-    padding: 16,
+  emptySelectionBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#111C20',
+    padding: 20,
+    borderRadius: 12,
+    marginBottom: 16,
+    borderWidth: 2,
+    borderColor: '#27C992',
+    borderStyle: 'dashed',
+  },
+  emptySelectionInfo: {
+    flex: 1,
+    marginLeft: 16,
+  },
+  emptySelectionText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#fff',
+    marginBottom: 4,
+  },
+  emptySelectionSubText: {
+    fontSize: 13,
+    color: '#999',
+  },
+  selectButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 16,
     borderRadius: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 2,
+    backgroundColor: '#27C992',
+  },
+  selectButtonText: {
+    fontSize: 14,
+    color: '#fff',
+    fontWeight: '600',
+  },
+  emptyTariffBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'transparent',
+    padding: 20,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: '#27C992',
+    borderStyle: 'dashed',
+    marginTop: 8,
+  },
+  emptyTariffInfo: {
+    flex: 1,
+    marginLeft: 16,
+  },
+  emptyTariffText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#fff',
+    marginBottom: 4,
+  },
+  emptyTariffSubText: {
+    fontSize: 13,
+    color: '#999',
+  },
+  card: {
+    backgroundColor: '#111C20',
+    padding: 16,
+    borderRadius: 12,
     gap: 12,
   },
   cardLabel: {
     fontSize: 16,
     fontWeight: 'normal',
-    color: '#1a1a1a',
+    color: '#fff',
   },
   tariffGrid: {
     flexDirection: 'row',
@@ -387,15 +477,17 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderRadius: 8,
     height: 48,
-    backgroundColor: '#f1f5f9',
+    backgroundColor: '#122017',
+    borderWidth: 1,
+    borderColor: '#27C992',
   },
   tariffGridButtonSelected: {
-    backgroundColor: '#1173d4',
+    backgroundColor: '#27C992',
   },
   tariffGridButtonText: {
     fontSize: 16,
     fontWeight: '500',
-    color: '#1a1a1a',
+    color: '#fff',
   },
   tariffGridButtonTextSelected: {
     color: '#fff',
@@ -411,12 +503,14 @@ const styles = StyleSheet.create({
     borderRadius: 9999,
     width: 32,
     height: 32,
-    backgroundColor: '#e2e8f0',
+    backgroundColor: '#122017',
+    borderWidth: 1,
+    borderColor: '#27C992',
   },
   quantityStepperText: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#1a1a1a',
+    color: '#27C992',
   },
   quantityDisplay: {
     flex: 1,
@@ -428,7 +522,7 @@ const styles = StyleSheet.create({
   quantityText: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#1a1a1a',
+    color: '#fff',
   },
   totalCardWrapper: {
     paddingHorizontal: 0,
@@ -437,26 +531,21 @@ const styles = StyleSheet.create({
           flexDirection: 'column',
           alignItems: 'center',
           justifyContent: 'center',
-          borderRadius: 8,
-          shadowColor: '#000',
-          shadowOffset: { width: 0, height: 1 },
-          shadowOpacity: 0.05,
-          shadowRadius: 2,
-          elevation: 2,
-          backgroundColor: '#fff',
+          borderRadius: 12,
+          backgroundColor: '#111C20',
           padding: 16,
           gap: 4,
         },
   totalLabel: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#1a1a1a',
+    color: '#fff',
     textAlign: 'center',
   },
   totalValue: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#1173d4',
+    color: '#fff',
     textAlign: 'center',
   },
   loadingContainer: {
@@ -465,7 +554,7 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     fontSize: 16,
-    color: '#666',
+    color: '#fff',
   },
   emptyContainer: {
     padding: 40,
@@ -473,7 +562,7 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: 16,
-    color: '#999',
+    color: '#fff',
   },
   bottomButtonContainer: {
     position: 'absolute',
@@ -483,7 +572,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 16,
     paddingBottom: 34, // Espaço para a barra de navegação do sistema
-    backgroundColor: '#f6f7f8',
+    backgroundColor: '#122017',
   },
   generateQrCodeButton: {
     flex: 1,
@@ -496,11 +585,11 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     height: 56,
     paddingHorizontal: 20,
-    backgroundColor: '#1173d4',
-    shadowColor: '#1173d4',
+    backgroundColor: '#27C992',
+    shadowColor: '#27C992',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
-    shadowRadius: 6,
+    shadowRadius: 8,
     elevation: 8,
   },
   generateQrCodeButtonDisabled: {
@@ -522,3 +611,4 @@ const styles = StyleSheet.create({
     color: '#fff',
   },
 });
+

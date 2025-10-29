@@ -61,7 +61,6 @@ class PaymentService {
       );
       return response;
     } catch (error) {
-      console.error('Erro ao criar pagamento:', error);
       throw error;
     }
   }
@@ -76,7 +75,6 @@ class PaymentService {
       );
       return response;
     } catch (error) {
-      console.error('Erro ao buscar transação:', error);
       throw error;
     }
   }
@@ -91,7 +89,6 @@ class PaymentService {
       );
       return response;
     } catch (error) {
-      console.error('Erro ao buscar link de pagamento:', error);
       throw error;
     }
   }
@@ -104,7 +101,6 @@ class PaymentService {
       const response = await apiService.get(`${this.baseUrl}/transactions/`);
       return response;
     } catch (error) {
-      console.error('Erro ao listar transações:', error);
       throw error;
     }
   }
@@ -119,7 +115,6 @@ class PaymentService {
       );
       return response;
     } catch (error) {
-      console.error('Erro ao verificar status da transação:', error);
       throw error;
     }
   }

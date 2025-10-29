@@ -26,10 +26,9 @@ export default function PaymentDetailScreen() {
       setTimeout(() => {
         setCopied(false);
       }, 3000);
-    } catch (error) {
-      console.error('Erro ao copiar:', error);
-      Alert.alert('Erro', 'Não foi possível copiar o código');
-    }
+      } catch (error) {
+        Alert.alert('Erro', 'Não foi possível copiar o código');
+      }
   };
 
   const handleGoBack = () => {
@@ -44,8 +43,6 @@ export default function PaymentDetailScreen() {
       setIsCheckingPayment(true);
       const status = await paymentService.checkTransactionStatus(transactionId as string);
       
-      console.log('📊 Status do pagamento:', status);
-
       // Verificar se o pagamento foi aprovado
       if (status?.payment_status === 'aprovado' && !hasNavigatedRef.current) {
         hasNavigatedRef.current = true;
@@ -57,7 +54,7 @@ export default function PaymentDetailScreen() {
 
         // Navegar para tela de sucesso
         router.replace({
-          pathname: '/payment/payment-success',
+          pathname: '/(payment)/payment-success',
           params: {
             tariffName,
             tariffValue,
@@ -70,7 +67,7 @@ export default function PaymentDetailScreen() {
         });
       }
     } catch (error) {
-      console.error('Erro ao verificar status:', error);
+      // Erro silencioso
     } finally {
       setIsCheckingPayment(false);
     }
@@ -103,7 +100,7 @@ export default function PaymentDetailScreen() {
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={handleGoBack} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color="#007AFF" />
+          <Ionicons name="arrow-back" size={24} color="#fff" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Pagamento</Text>
         <View style={styles.placeholder} />
@@ -112,7 +109,7 @@ export default function PaymentDetailScreen() {
       <ScrollView style={styles.content} contentContainerStyle={styles.contentContainer}>
         {/* Informações da Tarifa */}
         <View style={styles.infoBox}>
-          <Ionicons name="receipt-outline" size={32} color="#007AFF" />
+          <Ionicons name="receipt-outline" size={32} color="#27C992" />
           <Text style={styles.infoTitle}>{tariffName}</Text>
           <Text style={styles.infoAmount}>{formatCurrencyWithSymbol(Array.isArray(tariffValue) ? tariffValue[0] : tariffValue)}</Text>
         </View>
@@ -149,6 +146,27 @@ export default function PaymentDetailScreen() {
             </Text>
           </View>
         )}
+
+        {/* Botão temporário para testar tela de sucesso */}
+        <TouchableOpacity
+          style={styles.testButton}
+          onPress={() => {
+            router.replace({
+              pathname: '/(payment)/payment-success',
+              params: {
+                tariffName,
+                tariffValue,
+                transactionId: transactionId as string || 'test-123',
+                busLineId,
+                busLineName,
+                busLineCode,
+                vehiclePrefix,
+              },
+            });
+          }}
+        >
+          <Text style={styles.testButtonText}>🧪 Testar Tela de Sucesso</Text>
+        </TouchableOpacity>
       </ScrollView>
     </View>
   );
@@ -157,21 +175,16 @@ export default function PaymentDetailScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#122017',
   },
   header: {
-    backgroundColor: '#fff',
+    backgroundColor: '#122017',
     paddingTop: 50,
     paddingBottom: 16,
     paddingHorizontal: 16,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
   },
   backButton: {
     padding: 8,
@@ -179,7 +192,10 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 20,
     fontWeight: '600',
-    color: '#1a1a1a',
+    color: '#fff',
+    flex: 1,
+    textAlign: 'center',
+    paddingRight: 8,
   },
   placeholder: {
     width: 40,
@@ -192,28 +208,23 @@ const styles = StyleSheet.create({
     paddingBottom: 40,
   },
   infoBox: {
-    backgroundColor: '#fff',
+    backgroundColor: '#111C20',
     padding: 24,
     borderRadius: 16,
     alignItems: 'center',
     marginBottom: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
   },
   infoTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#333',
+    color: '#fff',
     marginTop: 12,
     marginBottom: 8,
   },
   infoAmount: {
     fontSize: 32,
     fontWeight: 'bold',
-    color: '#007AFF',
+    color: '#27C992',
   },
   qrSection: {
     alignItems: 'center',
@@ -222,35 +233,30 @@ const styles = StyleSheet.create({
   qrTitle: {
     fontSize: 22,
     fontWeight: 'bold',
-    color: '#1a1a1a',
+    color: '#fff',
     marginBottom: 8,
   },
   qrSubtitle: {
     fontSize: 14,
-    color: '#666',
+    color: '#fff',
     marginBottom: 24,
   },
   qrCodeWrapper: {
-    backgroundColor: '#fff',
+    backgroundColor: '#111C20',
     padding: 20,
     borderRadius: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 5,
     marginBottom: 16,
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: 240,
+    minHeight: 280,
   },
   qrCodeImage: {
-    width: 240,
-    height: 240,
+    width: 280,
+    height: 280,
   },
   qrInstructions: {
     fontSize: 14,
-    color: '#666',
+    color: '#fff',
     textAlign: 'center',
     lineHeight: 20,
     paddingHorizontal: 20,
@@ -359,18 +365,32 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   statusBox: {
-    backgroundColor: '#E3F2FD',
+    backgroundColor: '#111C20',
     padding: 16,
     borderRadius: 12,
     marginTop: 16,
     alignItems: 'center',
     borderLeftWidth: 4,
-    borderLeftColor: '#007AFF',
+    borderLeftColor: '#27C992',
     width: '100%',
   },
   statusText: {
     fontSize: 14,
-    color: '#007AFF',
+    color: '#27C992',
+    fontWeight: '600',
+  },
+  testButton: {
+    backgroundColor: '#FF6B6B',
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    borderRadius: 12,
+    marginTop: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  testButtonText: {
+    color: '#fff',
+    fontSize: 16,
     fontWeight: '600',
   },
 } as const);

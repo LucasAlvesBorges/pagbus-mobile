@@ -4,6 +4,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { vehicleService, Vehicle } from '../../services/vehicleService';
+import { selectionService } from '../../services/selectionService';
 
 export default function SelectVehicleScreen() {
   const router = useRouter();
@@ -28,7 +29,6 @@ export default function SelectVehicleScreen() {
       setVehicles(data);
       setFilteredVehicles(data);
     } catch (error: any) {
-      console.error('Erro ao carregar veículos:', error);
       Alert.alert(
         'Erro',
         error?.message || 'Não foi possível carregar os veículos. Verifique sua conexão.'
@@ -52,21 +52,22 @@ export default function SelectVehicleScreen() {
     }
   }, [searchText, vehicles]);
 
-  const handleSelectVehicle = (vehicle: Vehicle) => {
-    const params = {
-      busLineId: busLineId as string,
-      busLineName: busLineName as string,
-      busLineCode: busLineCode as string,
-      busLineCompany: busLineCompany as string,
-      vehiclePrefix: vehicle.prefix,
-    };
-    
-    console.log('🚌 Navegando para tela de tarifas com:', params);
-    
-    router.push({
-      pathname: '/payment',
-      params,
-    });
+  const handleSelectVehicle = async (vehicle: Vehicle) => {
+    try {
+      // Salvar seleção no SecureStore
+      await selectionService.saveSelection({
+        busLineId: busLineId as string,
+        busLineName: busLineName as string,
+        busLineCode: busLineCode as string,
+        busLineCompany: (busLineCompany as string) || '1',
+        vehiclePrefix: vehicle.prefix,
+      });
+      
+      // Voltar para payment/index (vai carregar do SecureStore)
+      router.replace('/(payment)' as any);
+    } catch (error) {
+      Alert.alert('Erro', 'Não foi possível salvar a seleção');
+    }
   };
 
   const handleGoBack = () => {
@@ -80,7 +81,7 @@ export default function SelectVehicleScreen() {
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={handleGoBack} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color="#007AFF" />
+          <Ionicons name="arrow-back" size={24} color="#fff" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Selecionar Veículo</Text>
         <View style={styles.placeholder} />
@@ -100,10 +101,11 @@ export default function SelectVehicleScreen() {
         {!loading && vehicles.length > 0 && (
           <View style={styles.searchContainer}>
             <View style={styles.searchBox}>
-              <Ionicons name="search" size={20} color="#999" style={styles.searchIcon} />
+              <Ionicons name="search" size={20} color="#27C992" style={styles.searchIcon} />
               <TextInput
                 style={styles.searchInput}
                 placeholder="Buscar por prefixo do veículo..."
+                placeholderTextColor="#999"
                 value={searchText}
                 onChangeText={setSearchText}
                 autoCapitalize="none"
@@ -113,7 +115,7 @@ export default function SelectVehicleScreen() {
                   onPress={() => setSearchText('')}
                   style={styles.clearButton}
                 >
-                  <Ionicons name="close-circle" size={20} color="#999" />
+                  <Ionicons name="close-circle" size={20} color="#27C992" />
                 </TouchableOpacity>
               )}
             </View>
@@ -127,12 +129,12 @@ export default function SelectVehicleScreen() {
 
         {loading ? (
           <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#007AFF" />
+            <ActivityIndicator size="large" color="#27C992" />
             <Text style={styles.loadingText}>Carregando veículos...</Text>
           </View>
         ) : filteredVehicles.length === 0 ? (
           <View style={styles.emptyContainer}>
-            <Ionicons name="car-outline" size={64} color="#ccc" />
+            <Ionicons name="car-outline" size={64} color="#27C992" />
             <Text style={styles.emptyText}>
               {searchText ? 'Nenhum veículo encontrado' : 'Nenhum veículo disponível'}
             </Text>
@@ -149,12 +151,12 @@ export default function SelectVehicleScreen() {
                 onPress={() => handleSelectVehicle(vehicle)}
               >
                 <View style={styles.vehicleHeader}>
-                  <Ionicons name="car" size={32} color="#007AFF" />
+                  <Ionicons name="car" size={32} color="#27C992" />
                   <View style={styles.vehicleInfo}>
                     <Text style={styles.vehicleLabel}>Prefixo</Text>
                     <Text style={styles.vehiclePrefix}>{vehicle.prefix}</Text>
                   </View>
-                  <Ionicons name="chevron-forward" size={24} color="#ccc" />
+                  <Ionicons name="chevron-forward" size={24} color="#27C992" />
                 </View>
               </TouchableOpacity>
             ))}
@@ -168,21 +170,16 @@ export default function SelectVehicleScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#122017',
   },
   header: {
-    backgroundColor: '#fff',
+    backgroundColor: '#122017',
     paddingTop: 50,
     paddingBottom: 16,
     paddingHorizontal: 16,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
   },
   backButton: {
     padding: 8,
@@ -190,7 +187,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 20,
     fontWeight: '600',
-    color: '#1a1a1a',
+    color: '#fff',
   },
   placeholder: {
     width: 40,
@@ -205,16 +202,11 @@ const styles = StyleSheet.create({
   searchBox: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#fff',
+    backgroundColor: 'transparent',
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#e0e0e0',
+    borderColor: '#27C992',
     paddingHorizontal: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
   },
   searchIcon: {
     marginRight: 8,
@@ -223,7 +215,7 @@ const styles = StyleSheet.create({
     flex: 1,
     height: 48,
     fontSize: 16,
-    color: '#1a1a1a',
+    color: '#fff',
   },
   clearButton: {
     marginLeft: 8,
@@ -231,7 +223,7 @@ const styles = StyleSheet.create({
   },
   resultsCount: {
     fontSize: 14,
-    color: '#666',
+    color: '#fff',
     marginTop: 8,
     paddingLeft: 4,
   },
@@ -268,7 +260,7 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 16,
     fontSize: 16,
-    color: '#666',
+    color: '#fff',
   },
   emptyContainer: {
     flex: 1,
@@ -279,7 +271,7 @@ const styles = StyleSheet.create({
   emptyText: {
     marginTop: 16,
     fontSize: 16,
-    color: '#666',
+    color: '#fff',
     textAlign: 'center',
   },
   emptySubText: {
@@ -306,14 +298,9 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   vehicleCard: {
-    backgroundColor: '#fff',
+    backgroundColor: '#111C20',
     borderRadius: 12,
     marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
   },
   vehicleHeader: {
     flexDirection: 'row',
@@ -326,13 +313,13 @@ const styles = StyleSheet.create({
   },
   vehicleLabel: {
     fontSize: 12,
-    color: '#666',
+    color: '#fff',
     marginBottom: 4,
   },
   vehiclePrefix: {
     fontSize: 24,
     fontWeight: '700',
-    color: '#007AFF',
+    color: '#fff',
   },
 });
 

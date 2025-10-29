@@ -8,23 +8,8 @@ export default function RootLayout() {
       }}
     >
       <Stack.Screen name="(auth)" />
-      <Stack.Screen name="payment/select-busline" />
-      <Stack.Screen name="payment/select-vehicle" />
-      <Stack.Screen name="payment/index" />
-      <Stack.Screen
-        name="payment/payment-detail"
-        options={{
-          presentation: 'card',
-          animation: 'slide_from_right',
-        }}
-      />
-      <Stack.Screen
-        name="payment/payment-success"
-        options={{
-          presentation: 'card',
-          animation: 'slide_from_bottom',
-        }}
-      />
+      <Stack.Screen name="(tabs)" />
+      <Stack.Screen name="(payment)" />
     </Stack>
   );
 }
