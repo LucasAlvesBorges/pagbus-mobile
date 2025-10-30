@@ -190,27 +190,6 @@ export default function PaymentDetailScreen() {
             Abra o app do seu banco e escaneie este QR Code para pagar via PIX
           </Text>
         </View>
-
-        {/* Botão temporário para testar tela de sucesso */}
-        <TouchableOpacity
-          style={styles.testButton}
-          onPress={() => {
-            router.replace({
-              pathname: '/(payment)/payment-success',
-              params: {
-                tariffName,
-                tariffValue,
-                transactionId: transactionId as string || 'test-123',
-                busLineId,
-                busLineName,
-                busLineCode,
-                vehiclePrefix,
-              },
-            });
-          }}
-        >
-          <Text style={styles.testButtonText}>🧪 Testar Tela de Sucesso</Text>
-        </TouchableOpacity>
       </ScrollView>
     </View>
   );
@@ -421,20 +400,6 @@ const styles = StyleSheet.create({
   statusText: {
     fontSize: 14,
     color: '#27C992',
-    fontWeight: '600',
-  },
-  testButton: {
-    backgroundColor: '#FF6B6B',
-    paddingVertical: 16,
-    paddingHorizontal: 24,
-    borderRadius: 12,
-    marginTop: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  testButtonText: {
-    color: '#fff',
-    fontSize: 16,
     fontWeight: '600',
   },
 } as const);
