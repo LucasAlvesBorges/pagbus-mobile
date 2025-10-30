@@ -27,7 +27,6 @@ const resolveExpoHost = (): string | undefined => {
 
   return (
     expoGoConfig?.debuggerHost ||
-    expoGoConfig?.hostUri ||
     expoConfig?.hostUri ||
     manifest?.debuggerHost ||
     manifest?.hostUri
