@@ -7,6 +7,7 @@ import { PaymentRequest, paymentService } from '../../services/paymentService';
 import { buslineService, Tariff } from '../../services/buslineService';
 import { authService } from '../../services/authService';
 import { selectionService, BusSelection } from '../../services/selectionService';
+import { journeyService } from '../../services/journeyService';
 import { formatCurrency, formatCurrencyWithSymbol } from '../../utils/currency';
 
 export default function PaymentScreen() {
@@ -18,13 +19,27 @@ export default function PaymentScreen() {
   const [loading, setLoading] = useState(false);
   const [selectedTariff, setSelectedTariff] = useState<Tariff | null>(null);
   const [selection, setSelection] = useState<BusSelection | null>(null);
+  const [activeJourney, setActiveJourney] = useState<any>(null);
+  const [startingJourney, setStartingJourney] = useState(false);
+  const [generatingQRCode, setGeneratingQRCode] = useState(false);
 
   // Carregar seleção salva quando a tela ganhar foco
   useFocusEffect(
     useCallback(() => {
       loadSavedSelection();
+      loadActiveJourney();
     }, [])
   );
+
+  const loadActiveJourney = async () => {
+    try {
+      const journey = await journeyService.syncActiveJourney();
+      setActiveJourney(journey);
+    } catch (error) {
+      // Erro silencioso
+      setActiveJourney(null);
+    }
+  };
 
   const loadSavedSelection = async () => {
     try {
@@ -98,7 +113,14 @@ export default function PaymentScreen() {
       Alert.alert('Aviso', 'Por favor, selecione uma tarifa.');
       return;
     }
+    
+    if (generatingQRCode) {
+      return; // Evitar cliques duplos
+    }
+    
     try {
+      setGeneratingQRCode(true);
+      
       if (!selection) {
         Alert.alert('Aviso', 'Por favor, selecione uma linha e veículo.');
         return;
@@ -130,6 +152,7 @@ export default function PaymentScreen() {
         bus_line_id: selection.busLineId,
         vehicle_prefix: selection.vehiclePrefix,
         user_id: userId || undefined,
+        journey_id: activeJourney?.id || undefined,
       };
 
       const response = await paymentService.createPayment(paymentData);
@@ -161,11 +184,49 @@ export default function PaymentScreen() {
         'Erro ao conectar com o servidor',
         error?.message || 'Verifique se o backend está rodando e acessível.'
       );
+    } finally {
+      setGeneratingQRCode(false);
     }
   };
 
   const handleSelectBusLine = () => {
     router.push('/(payment)/select-busline');
+  };
+
+  const handleStartJourney = async () => {
+    if (!selection) {
+      Alert.alert('Aviso', 'Por favor, selecione uma linha e veículo primeiro.');
+      return;
+    }
+
+    try {
+      setStartingJourney(true);
+      
+      // Criar jornada na API
+      const journey = await journeyService.createJourney({
+        bus_line: parseInt(selection.busLineId),
+        vehicle_prefix: selection.vehiclePrefix,
+      });
+
+      // Atualizar jornada ativa
+      setActiveJourney(journey);
+      
+      // Recarregar jornada do servidor para garantir sincronização
+      await loadActiveJourney();
+
+      Alert.alert(
+        'Sucesso',
+        `Jornada iniciada com sucesso!\nLinha: ${selection.busLineName}\nVeículo: ${selection.vehiclePrefix}`,
+        [{ text: 'OK' }]
+      );
+    } catch (error: any) {
+      Alert.alert(
+        'Erro',
+        error?.message || 'Não foi possível iniciar a jornada. Verifique sua conexão.'
+      );
+    } finally {
+      setStartingJourney(false);
+    }
   };
 
   const handleLogout = async () => {
@@ -214,6 +275,14 @@ export default function PaymentScreen() {
             <View style={styles.selectedInfo}>
               <Text style={styles.selectedText}>{selection.busLineName}</Text>
               <Text style={styles.selectedSubText}>Veículo: {selection.vehiclePrefix}</Text>
+              {activeJourney && (
+                <>
+                  <Text style={styles.journeyIdText}>Jornada #{activeJourney.id}</Text>
+                  <Text style={styles.journeyStatusText}>
+                    ✓  {activeJourney.payments_count || 0} pagamento(s) • R$ {parseFloat(activeJourney.total_amount || '0').toFixed(2)}
+                  </Text>
+                </>
+              )}
             </View>
             <TouchableOpacity onPress={handleSelectBusLine} style={styles.changeButton}>
               <Text style={styles.changeButtonText}>Alterar</Text>
@@ -230,6 +299,30 @@ export default function PaymentScreen() {
               <Text style={styles.selectButtonText}>Selecionar</Text>
             </TouchableOpacity>
           </View>
+        )}
+
+        {/* Botão Iniciar Jornada - aparece quando há seleção mas não há jornada ativa */}
+        {selection && !activeJourney && (
+          <TouchableOpacity
+            style={[
+              styles.startJourneyButtonContainer,
+              startingJourney && styles.startJourneyButtonContainerDisabled
+            ]}
+            onPress={handleStartJourney}
+            disabled={startingJourney}
+          >
+            {startingJourney ? (
+              <View style={styles.buttonContent}>
+                <ActivityIndicator size="small" color="#fff" style={styles.buttonSpinner} />
+                <Text style={styles.startJourneyButtonText}>Iniciando...</Text>
+              </View>
+            ) : (
+              <>
+                <Ionicons name="play-circle" size={24} color="#fff" />
+                <Text style={styles.startJourneyButtonText}>Iniciar Jornada</Text>
+              </>
+            )}
+          </TouchableOpacity>
         )}
 
         {/* Valor da Tarifa */}
@@ -255,13 +348,16 @@ export default function PaymentScreen() {
                   style={[
                     styles.tariffGridButton,
                     selectedTariff?.id === tariff.id && styles.tariffGridButtonSelected,
+                    !activeJourney && styles.tariffGridButtonDisabled,
                   ]}
                   onPress={() => handleSelectTariff(tariff)}
+                  disabled={!activeJourney}
                 >
                   <Text
                     style={[
                       styles.tariffGridButtonText,
                       selectedTariff?.id === tariff.id && styles.tariffGridButtonTextSelected,
+                      !activeJourney && styles.tariffGridButtonTextDisabled,
                     ]}
                   >
                     {formatCurrencyWithSymbol(tariff.value)}
@@ -277,19 +373,33 @@ export default function PaymentScreen() {
           <Text style={styles.cardLabel}>Quantidade de Passagens</Text>
           <View style={styles.quantityControls}>
             <TouchableOpacity
-              style={styles.quantityStepperButton}
+              style={[
+                styles.quantityStepperButton,
+                !activeJourney && styles.quantityStepperButtonDisabled,
+              ]}
               onPress={handleDecreaseQuantity}
+              disabled={!activeJourney}
             >
-              <Text style={styles.quantityStepperText}>-</Text>
+              <Text style={[
+                styles.quantityStepperText,
+                !activeJourney && styles.quantityStepperTextDisabled,
+              ]}>-</Text>
             </TouchableOpacity>
             <View style={styles.quantityDisplay}>
               <Text style={styles.quantityText}>{quantity}</Text>
             </View>
             <TouchableOpacity
-              style={styles.quantityStepperButton}
+              style={[
+                styles.quantityStepperButton,
+                !activeJourney && styles.quantityStepperButtonDisabled,
+              ]}
               onPress={handleIncreaseQuantity}
+              disabled={!activeJourney}
             >
-              <Text style={styles.quantityStepperText}>+</Text>
+              <Text style={[
+                styles.quantityStepperText,
+                !activeJourney && styles.quantityStepperTextDisabled,
+              ]}>+</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -308,12 +418,12 @@ export default function PaymentScreen() {
         <TouchableOpacity
           style={[
             styles.generateQrCodeButton,
-            (!selectedTariff || loading || !selection) && styles.generateQrCodeButtonDisabled
+            (!selectedTariff || loading || !selection || !activeJourney || generatingQRCode) && styles.generateQrCodeButtonDisabled
           ]}
           onPress={handleGenerateQRCode}
-          disabled={!selectedTariff || loading || !selection}
+          disabled={!selectedTariff || loading || !selection || !activeJourney || generatingQRCode}
         >
-          {loading ? (
+          {generatingQRCode ? (
             <View style={styles.buttonContent}>
               <ActivityIndicator size="small" color="#fff" style={styles.buttonSpinner} />
               <Text style={styles.generateQrCodeButtonText}>Gerando...</Text>
@@ -382,6 +492,17 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#fff',
   },
+  journeyIdText: {
+    fontSize: 14,
+    color: '#27C992',
+    fontWeight: '600',
+    marginTop: 4,
+  },
+  journeyStatusText: {
+    fontSize: 12,
+    color: '#27C992',
+    marginTop: 4,
+  },
   changeButton: {
     paddingVertical: 6,
     paddingHorizontal: 12,
@@ -428,6 +549,32 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#fff',
     fontWeight: '600',
+  },
+  startJourneyButtonContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#27C992',
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    borderRadius: 12,
+    marginBottom: 24,
+    gap: 12,
+    shadowColor: '#27C992',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  startJourneyButtonContainerDisabled: {
+    backgroundColor: '#94a3b8',
+    shadowOpacity: 0.1,
+    elevation: 2,
+  },
+  startJourneyButtonText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#fff',
   },
   emptyTariffBox: {
     flexDirection: 'row',
@@ -483,6 +630,10 @@ const styles = StyleSheet.create({
   tariffGridButtonSelected: {
     backgroundColor: '#27C992',
   },
+  tariffGridButtonDisabled: {
+    opacity: 0.5,
+    borderColor: '#666',
+  },
   tariffGridButtonText: {
     fontSize: 16,
     fontWeight: '500',
@@ -490,6 +641,9 @@ const styles = StyleSheet.create({
   },
   tariffGridButtonTextSelected: {
     color: '#fff',
+  },
+  tariffGridButtonTextDisabled: {
+    color: '#999',
   },
   quantityControls: {
     flexDirection: 'row',
@@ -506,10 +660,17 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#27C992',
   },
+  quantityStepperButtonDisabled: {
+    opacity: 0.5,
+    borderColor: '#666',
+  },
   quantityStepperText: {
     fontSize: 20,
     fontWeight: 'bold',
     color: '#27C992',
+  },
+  quantityStepperTextDisabled: {
+    color: '#999',
   },
   quantityDisplay: {
     flex: 1,

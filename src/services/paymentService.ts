@@ -22,6 +22,7 @@ export interface PaymentRequest {
   bus_line_id?: string;
   vehicle_prefix?: string;
   user_id?: number;
+  journey_id?: number;
 }
 
 export interface PaymentResponse {

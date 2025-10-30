@@ -8,7 +8,7 @@ const ENV_CONFIG = {
   development: {
     // Use uma dessas URLs para desenvolvimento
     LOCAL: 'http://localhost:8000/api/v1',
-    NGROK: 'https://c3877d1717d2.ngrok-free.app/api/v1',
+    NGROK: 'https://34ad3b84046f.ngrok-free.app/api/v1',
     IOS_SIMULATOR: 'http://127.0.0.1:8000/api/v1',
   },
   production: {
@@ -92,9 +92,16 @@ api.interceptors.request.use(
       
       if (token && config.headers) {
         config.headers.Authorization = `Bearer ${token}`;
+        if (isDev) {
+          console.log(`[API] Request ${config.method?.toUpperCase()} ${config.url} - Token presente`);
+        }
+      } else {
+        if (isDev) {
+          console.log(`[API] Request ${config.method?.toUpperCase()} ${config.url} - SEM TOKEN`);
+        }
       }
     } catch (error) {
-      console.log('Erro ao buscar token:', error);
+      console.error('[API] Erro ao buscar token:', error);
     }
     
     return config;
@@ -114,22 +121,79 @@ api.interceptors.response.use(
     const originalRequest = error.config as any;
 
     // Tratar erro 401 (não autorizado)
-    if (error.response?.status === 401 && !originalRequest?._retry) {
-      originalRequest._retry = true;
-
-      try {
-        // Aqui você pode implementar refresh token se necessário
-        // Por enquanto, apenas limpa o token
+    if (error.response?.status === 401) {
+      // Verificar se já tentou fazer refresh
+      if (originalRequest?._retry) {
+        // Se já tentou uma vez, não tentar novamente
+        console.log('[API] Erro 401 após retry - token inválido ou expirado');
         await SecureStore.deleteItemAsync('auth_token');
+        await SecureStore.deleteItemAsync('refresh_token');
+        await SecureStore.deleteItemAsync('user_id');
         
-        // Redirecionar para tela de login
-        // navigation.navigate('Login');
-      } catch (refreshError) {
-        console.error('Erro ao fazer refresh token:', refreshError);
-        return Promise.reject(refreshError);
+        // Retornar erro ao invés de tentar novamente
+        return Promise.reject({
+          status: 401,
+          message: 'Não autorizado. Faça login novamente.',
+          data: error.response?.data,
+        });
       }
 
-      return api(originalRequest);
+      // Tentar fazer refresh token
+      originalRequest._retry = true;
+      
+      try {
+        const refreshToken = await SecureStore.getItemAsync('refresh_token');
+        
+        if (refreshToken) {
+          console.log('[API] Tentando refresh token...');
+          // Tentar fazer refresh do token usando o endpoint padrão do Simple JWT
+          // O endpoint padrão é /api/token/refresh/ 
+          try {
+            const refreshResponse = await axios.post(`${BASE_URL.replace('/api/v1', '')}/api/token/refresh/`, {
+              refresh: refreshToken
+            });
+            
+            if (refreshResponse?.data?.access) {
+              // Salvar novo token
+              await SecureStore.setItemAsync('auth_token', refreshResponse.data.access);
+              console.log('[API] Token atualizado com sucesso');
+              
+              // Adicionar novo token à requisição original
+              originalRequest.headers = originalRequest.headers || {};
+              originalRequest.headers.Authorization = `Bearer ${refreshResponse.data.access}`;
+              
+              // Retentar requisição original
+              return api(originalRequest);
+            }
+          } catch (refreshError: any) {
+            console.log('[API] Erro ao fazer refresh:', refreshError?.response?.status || refreshError?.message);
+            // Se o refresh falhar, continuar para limpar tokens
+          }
+        }
+        
+        // Se não conseguiu fazer refresh, limpar tokens
+        console.log('[API] Não foi possível fazer refresh - limpando tokens');
+        await SecureStore.deleteItemAsync('auth_token');
+        await SecureStore.deleteItemAsync('refresh_token');
+        await SecureStore.deleteItemAsync('user_id');
+        
+        return Promise.reject({
+          status: 401,
+          message: 'Sessão expirada. Faça login novamente.',
+          data: error.response?.data,
+        });
+      } catch (refreshError) {
+        console.error('[API] Erro ao fazer refresh token:', refreshError);
+        await SecureStore.deleteItemAsync('auth_token');
+        await SecureStore.deleteItemAsync('refresh_token');
+        await SecureStore.deleteItemAsync('user_id');
+        
+        return Promise.reject({
+          status: 401,
+          message: 'Erro de autenticação. Faça login novamente.',
+          data: error.response?.data,
+        });
+      }
     }
 
     // Tratar outros erros
@@ -140,7 +204,7 @@ api.interceptors.response.use(
       // Lançar erro customizado
       return Promise.reject({
         status,
-        message: (data as any)?.message || 'Erro ao processar requisição',
+        message: (data as any)?.message || (data as any)?.detail || 'Erro ao processar requisição',
         data,
       });
     } else if (error.request) {
