@@ -11,43 +11,34 @@ import {
   ActivityIndicator,
   RefreshControl,
 } from 'react-native';
-import { paymentService } from '../../services/paymentService';
+import { journeyService, type Journey } from '../../services/journeyService';
 import { formatCurrencyWithSymbol } from '../../utils/currency';
 import { formatDateToBrasilia } from '../../utils/date';
 
-interface Transaction {
-  id: string;
-  created_at: string;
-  linha?: string;
-  veiculo?: string;
-  quantidade?: number;
-  valor_total?: string;
-}
-
 export default function HistoryScreen() {
   const router = useRouter();
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [journeys, setJourneys] = useState<Journey[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
-    loadTransactions();
+    loadJourneys();
   }, []);
 
-  const loadTransactions = async () => {
+  const loadJourneys = async () => {
     try {
       setLoading(true);
       
-      // Buscar histórico do usuário logado
-      const data = await paymentService.getUserTransactionHistory();
+      // Buscar jornadas finalizadas do usuário logado
+      const data = await journeyService.listJourneys(true);
       
-      // O endpoint retorna um array de TransactionHistory
-      const transactionsList = Array.isArray(data) ? data : [];
+      // O endpoint retorna um array de Journey
+      const journeysList = Array.isArray(data) ? data : [];
       
-      setTransactions(transactionsList);
+      setJourneys(journeysList);
     } catch (error: any) {
       // Não mostrar erro, apenas deixar vazio
-      setTransactions([]);
+      setJourneys([]);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -56,31 +47,25 @@ export default function HistoryScreen() {
 
   const onRefresh = () => {
     setRefreshing(true);
-    loadTransactions();
+    loadJourneys();
   };
-
 
   const formatDate = (dateString: string) => {
     return formatDateToBrasilia(dateString);
   };
 
-  const handleTransactionPress = (transaction: Transaction) => {
-    // Navegar para detalhes da transação se necessário
+  const handleJourneyPress = (journey: Journey) => {
+    // Navegar para detalhes da jornada
     router.push({
-      pathname: '/payment/payment-detail',
+      pathname: '/(tabs)/journey-detail',
       params: {
-        transactionId: transaction.id,
+        journeyId: journey.id.toString(),
       },
     });
   };
 
   return (
-    <ScrollView
-      style={styles.container}
-      refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-      }
-    >
+    <View style={styles.container}>
       <StatusBar style="dark" />
 
       {/* Header */}
@@ -88,74 +73,81 @@ export default function HistoryScreen() {
         <Text style={styles.headerTitle}>Histórico</Text>
       </View>
 
-      {/* Content */}
-      <View style={styles.content}>
-        {loading ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#27C992" />
-            <Text style={styles.loadingText}>Carregando histórico...</Text>
-          </View>
-        ) : transactions.length === 0 ? (
-          <View style={styles.emptyContainer}>
-            <Ionicons name="receipt-outline" size={64} color="#A5DCC6" />
-            <Text style={styles.emptyTitle}>Nenhuma transação encontrada</Text>
-            <Text style={styles.emptySubtitle}>
-              Suas transações aparecerão aqui
-            </Text>
-            <TouchableOpacity
-              style={styles.emptyButton}
-              onPress={() => router.push('/(tabs)/index' as any)}
-            >
-              <Text style={styles.emptyButtonText}>Fazer primeiro pagamento</Text>
-            </TouchableOpacity>
-          </View>
-        ) : (
-          transactions.map((transaction) => (
-            <TouchableOpacity
-              key={transaction.id}
-              style={styles.transactionCard}
-              onPress={() => handleTransactionPress(transaction)}
-              activeOpacity={0.7}
-            >
-              <View style={styles.transactionHeader}>
-                <View style={styles.transactionInfo}>
-                  <Text style={styles.transactionTitle}>
-                    {transaction.linha || 'Transação'}
-                  </Text>
-                  {transaction.veiculo && (
-                    <Text style={styles.transactionSubtitle}>
-                      Veículo: {transaction.veiculo}
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
+      >
+        {/* Content */}
+        <View style={styles.content}>
+          {loading ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color="#27C992" />
+              <Text style={styles.loadingText}>Carregando histórico...</Text>
+            </View>
+          ) : journeys.length === 0 ? (
+            <View style={styles.emptyContainer}>
+              <Ionicons name="receipt-outline" size={64} color="#A5DCC6" />
+              <Text style={styles.emptyTitle}>Nenhuma jornada encontrada</Text>
+              <Text style={styles.emptySubtitle}>
+                Suas jornadas finalizadas aparecerão aqui
+              </Text>
+              <TouchableOpacity
+                style={styles.emptyButton}
+                onPress={() => router.push('/(tabs)/index' as any)}
+              >
+                <Text style={styles.emptyButtonText}>Fazer primeiro pagamento</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            journeys.map((journey) => (
+              <TouchableOpacity
+                key={journey.id}
+                style={styles.journeyCard}
+                onPress={() => handleJourneyPress(journey)}
+                activeOpacity={0.7}
+              >
+                <View style={styles.journeyHeader}>
+                  <View style={styles.journeyInfo}>
+                    <Text style={styles.journeyTitle}>
+                      {journey.bus_line_name || 'Jornada'}
                     </Text>
-                  )}
-                </View>
-                {transaction.valor_total && (
-                  <Text style={styles.amountValue}>
-                    {formatCurrencyWithSymbol(transaction.valor_total)}
-                  </Text>
-                )}
-              </View>
-
-              <View style={styles.transactionDetails}>
-                {transaction.quantidade && (
-                  <View style={styles.detailItem}>
-                    <Ionicons name="receipt-outline" size={16} color="#A5DCC6" />
-                    <Text style={styles.detailText}>
-                      {transaction.quantidade}x Passagem
+                    {journey.vehicle_prefix && (
+                      <Text style={styles.journeySubtitle}>
+                        Veículo: {journey.vehicle_prefix}
+                      </Text>
+                    )}
+                    <Text style={styles.journeySubtitle}>
+                      Jornada #{journey.id}
                     </Text>
                   </View>
-                )}
-                <View style={styles.detailItem}>
-                  <Ionicons name="calendar-outline" size={16} color="#A5DCC6" />
-                  <Text style={styles.detailText}>
-                    {formatDate(transaction.created_at)}
+                  <Text style={styles.amountValue}>
+                    {formatCurrencyWithSymbol(journey.total_amount)}
                   </Text>
                 </View>
-              </View>
-            </TouchableOpacity>
-          ))
-        )}
-      </View>
-    </ScrollView>
+
+                <View style={styles.journeyDetails}>
+                  <View style={styles.detailItem}>
+                    <Ionicons name="people-outline" size={16} color="#A5DCC6" />
+                    <Text style={styles.detailText}>
+                      {journey.total_passengers || 0} passagem(ns)
+                    </Text>
+                  </View>
+                  <View style={styles.detailItem}>
+                    <Ionicons name="calendar-outline" size={16} color="#A5DCC6" />
+                    <Text style={styles.detailText}>
+                      {formatDate(journey.finalized_at || journey.created_at)}
+                    </Text>
+                  </View>
+                </View>
+              </TouchableOpacity>
+            ))
+          )}
+        </View>
+      </ScrollView>
+    </View>
   );
 }
 
@@ -175,6 +167,12 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#fff',
     textAlign: 'center',
+  },
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
   },
   content: {
     padding: 24,
@@ -225,7 +223,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
-  transactionCard: {
+  journeyCard: {
     backgroundColor: '#111C20',
     borderRadius: 10,
     padding: 12,
@@ -238,22 +236,22 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#27C99220',
   },
-  transactionHeader: {
+  journeyHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
   },
-  transactionInfo: {
+  journeyInfo: {
     flex: 1,
     marginRight: 8,
   },
-  transactionTitle: {
+  journeyTitle: {
     fontSize: 15,
     fontWeight: '600',
     color: '#fff',
     marginBottom: 2,
   },
-  transactionSubtitle: {
+  journeySubtitle: {
     fontSize: 12,
     color: '#A5DCC6',
   },
@@ -262,7 +260,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#27C992',
   },
-  transactionDetails: {
+  journeyDetails: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 10,

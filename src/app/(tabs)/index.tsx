@@ -190,7 +190,69 @@ export default function PaymentScreen() {
   };
 
   const handleSelectBusLine = () => {
-    router.push('/(payment)/select-busline');
+    // Se houver jornada ativa, mostrar modal de confirmação para finalizar
+    if (activeJourney) {
+      Alert.alert(
+        'Finalizar Jornada',
+        `Você tem uma jornada ativa com ${activeJourney.payments_count || 0} pagamento(s) e total de R$ ${parseFloat(activeJourney.total_amount || '0').toFixed(2)}.\n\nDeseja finalizar a jornada?`,
+        [
+          {
+            text: 'Cancelar',
+            style: 'cancel',
+          },
+          {
+            text: 'Finalizar',
+            onPress: handleFinalizeJourney,
+            style: 'destructive',
+          },
+        ]
+      );
+    } else {
+      // Se não houver jornada ativa, apenas navegar para seleção
+      router.push('/(payment)/select-busline');
+    }
+  };
+
+  const handleFinalizeJourney = async () => {
+    if (!activeJourney) {
+      Alert.alert('Aviso', 'Nenhuma jornada ativa encontrada.');
+      return;
+    }
+
+    try {
+      setStartingJourney(true); // Reutilizar o estado de loading
+      
+      // Finalizar jornada na API (pode retornar null se foi deletada)
+      const finalizedJourney = await journeyService.finalizeJourney(activeJourney.id);
+      
+      // Limpar jornada ativa
+      setActiveJourney(null);
+      
+      // Limpar seleção também para permitir nova seleção
+      await selectionService.clearSelection();
+      setSelection(null);
+      setSelectedTariff(null);
+      
+      // Mostrar mensagem apropriada
+      if (finalizedJourney === null) {
+        Alert.alert(
+          'Sucesso',
+          'Jornada removida (sem pagamentos).'
+        );
+      } else {
+        Alert.alert(
+          'Sucesso',
+          'Jornada finalizada com sucesso!'
+        );
+      }
+    } catch (error: any) {
+      Alert.alert(
+        'Erro',
+        error?.message || 'Não foi possível finalizar a jornada. Verifique sua conexão.'
+      );
+    } finally {
+      setStartingJourney(false);
+    }
   };
 
   const handleStartJourney = async () => {
@@ -213,12 +275,6 @@ export default function PaymentScreen() {
       
       // Recarregar jornada do servidor para garantir sincronização
       await loadActiveJourney();
-
-      Alert.alert(
-        'Sucesso',
-        `Jornada iniciada com sucesso!\nLinha: ${selection.busLineName}\nVeículo: ${selection.vehiclePrefix}`,
-        [{ text: 'OK' }]
-      );
     } catch (error: any) {
       Alert.alert(
         'Erro',
@@ -279,13 +335,26 @@ export default function PaymentScreen() {
                 <>
                   <Text style={styles.journeyIdText}>Jornada #{activeJourney.id}</Text>
                   <Text style={styles.journeyStatusText}>
-                    ✓  {activeJourney.payments_count || 0} pagamento(s) • R$ {parseFloat(activeJourney.total_amount || '0').toFixed(2)}
+                    ✓  {activeJourney.total_passengers || 0} passagem(ns) • R$ {parseFloat(activeJourney.total_amount || '0').toFixed(2)}
                   </Text>
                 </>
               )}
             </View>
-            <TouchableOpacity onPress={handleSelectBusLine} style={styles.changeButton}>
-              <Text style={styles.changeButtonText}>Alterar</Text>
+            <TouchableOpacity 
+              onPress={handleSelectBusLine} 
+              style={[
+                styles.changeButton,
+                activeJourney && styles.finalizeButton
+              ]}
+              disabled={startingJourney}
+            >
+              {startingJourney ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <Text style={styles.changeButtonText}>
+                  {activeJourney ? 'Finalizar' : 'Alterar'}
+                </Text>
+              )}
             </TouchableOpacity>
           </View>
         ) : (
@@ -508,6 +577,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     borderRadius: 6,
     backgroundColor: '#27C992',
+  },
+  finalizeButton: {
+    backgroundColor: '#FF6B6B',
   },
   changeButtonText: {
     fontSize: 14,

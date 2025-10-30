@@ -13,6 +13,7 @@ export interface Journey {
   vehicle: number | null;
   vehicle_prefix: string | null;
   total_amount: string;
+  total_passengers: number;
   finalizada: boolean;
   opened_hours: string | null;
   opened_hours_display: string | null;
@@ -104,12 +105,23 @@ class JourneyService {
 
   /**
    * Finaliza uma jornada
+   * Retorna null se a jornada foi deletada (sem pagamentos), caso contrário retorna a jornada finalizada
    */
-  async finalizeJourney(journeyId: number): Promise<Journey> {
+  async finalizeJourney(journeyId: number): Promise<Journey | null> {
     try {
-      const response = await apiService.post<Journey>(
+      const response = await apiService.post<Journey | { detail: string }>(
         `${this.baseUrl}/journeys/${journeyId}/finalize/`
       );
+      
+      // Se a resposta contém apenas 'detail', significa que a jornada foi deletada
+      if ('detail' in response && !('id' in response)) {
+        // Limpar jornada ativa do SecureStore
+        await SecureStore.deleteItemAsync(ACTIVE_JOURNEY_KEY);
+        return null;
+      }
+      
+      // Caso contrário, retornar a jornada finalizada
+      const journey = response as Journey;
       
       // Limpar jornada ativa do SecureStore se esta foi finalizada
       const storedId = await SecureStore.getItemAsync(ACTIVE_JOURNEY_KEY);
@@ -117,7 +129,7 @@ class JourneyService {
         await SecureStore.deleteItemAsync(ACTIVE_JOURNEY_KEY);
       }
       
-      return response;
+      return journey;
     } catch (error) {
       throw error;
     }
@@ -192,6 +204,20 @@ class JourneyService {
       }
       
       return null;
+    }
+  }
+
+  /**
+   * Busca os pagamentos de uma jornada específica
+   */
+  async getJourneyPayments(journeyId: number): Promise<any[]> {
+    try {
+      const response = await apiService.get<any[]>(
+        `${this.baseUrl}/journeys/${journeyId}/payments/`
+      );
+      return response;
+    } catch (error) {
+      throw error;
     }
   }
 }

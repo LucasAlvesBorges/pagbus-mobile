@@ -39,6 +39,12 @@ export default function TabsLayout() {
           ),
         }}
       />
+      <Tabs.Screen
+        name="journey-detail"
+        options={{
+          href: null, // Oculta da barra de tabs
+        }}
+      />
     </Tabs>
   );
 }
