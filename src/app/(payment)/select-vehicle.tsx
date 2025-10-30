@@ -23,9 +23,8 @@ export default function SelectVehicleScreen() {
   const loadVehicles = async () => {
     try {
       setLoading(true);
-      // TODO: Pegar company_id do contexto de autenticação
-      const companyId = busLineCompany ? parseInt(busLineCompany as string) : 1;
-      const data = await vehicleService.getVehicles(companyId);
+      // Não passar company_id - o backend filtra automaticamente pela empresa do usuário logado
+      const data = await vehicleService.getVehicles();
       setVehicles(data);
       setFilteredVehicles(data);
     } catch (error: any) {

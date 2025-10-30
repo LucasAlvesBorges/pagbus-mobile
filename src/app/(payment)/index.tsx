@@ -108,11 +108,14 @@ export default function PaymentScreen() {
       const tariffValue = parseFloat(selectedTariff.value);
       const totalAmount = tariffValue * quantity;
       
-      // Extrair company_id do busLineCompany ou usar padrão
-      const companyId = parseInt(selection.busLineCompany) || 1;
-      
-      // Obter user_id do auth service
+      // Obter user_id e company_id do auth service
       const userId = await authService.getStoredUserId();
+      const companyId = await authService.getStoredCompanyId();
+      
+      if (!companyId) {
+        Alert.alert('Erro', 'Não foi possível identificar a empresa do usuário. Faça login novamente.');
+        return;
+      }
       
       const paymentData: PaymentRequest = {
         company_id: companyId,

@@ -7,6 +7,9 @@ export interface Journey {
   id: number;
   user: number;
   user_name: string;
+  company: number;
+  company_id: number;
+  company_name: string;
   bus_line: number | null;
   bus_line_name: string | null;
   bus_line_code: string | null;

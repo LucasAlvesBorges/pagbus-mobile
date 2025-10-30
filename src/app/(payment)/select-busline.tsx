@@ -20,9 +20,8 @@ export default function SelectBusLineScreen() {
   const loadBusLines = async () => {
     try {
       setLoading(true);
-      // TODO: Pegar company_id do contexto de autenticação
-      const companyId = 1; // Temporário - deveria vir do contexto de autenticação
-      const data = await buslineService.getBusLines(companyId);
+      // Não passar company_id - o backend filtra automaticamente pela empresa do usuário logado
+      const data = await buslineService.getBusLines();
       setBusLines(data);
       setFilteredBusLines(data);
     } catch (error: any) {

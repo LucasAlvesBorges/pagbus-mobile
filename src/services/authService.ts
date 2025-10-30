@@ -5,6 +5,7 @@ import { apiService } from './api';
 const ACCESS_TOKEN_KEY = 'auth_token';
 const REFRESH_TOKEN_KEY = 'refresh_token';
 const USER_ID_KEY = 'user_id';
+const COMPANY_ID_KEY = 'company_id';
 
 export interface LoginCredentials {
   username: string;
@@ -15,6 +16,7 @@ export interface LoginResponse {
   refresh: string;
   access: string;
   user_id: number;
+  company_id?: number;
 }
 
 export interface RegisterPayload {
@@ -33,6 +35,9 @@ class AuthService {
     await SecureStore.setItemAsync(ACCESS_TOKEN_KEY, response.access);
     await SecureStore.setItemAsync(REFRESH_TOKEN_KEY, response.refresh);
     await SecureStore.setItemAsync(USER_ID_KEY, response.user_id.toString());
+    if (response.company_id) {
+      await SecureStore.setItemAsync(COMPANY_ID_KEY, response.company_id.toString());
+    }
     return response;
   }
 
@@ -45,6 +50,7 @@ class AuthService {
       SecureStore.deleteItemAsync(ACCESS_TOKEN_KEY),
       SecureStore.deleteItemAsync(REFRESH_TOKEN_KEY),
       SecureStore.deleteItemAsync(USER_ID_KEY),
+      SecureStore.deleteItemAsync(COMPANY_ID_KEY),
     ]);
   }
 
@@ -59,6 +65,11 @@ class AuthService {
   async getStoredUserId(): Promise<number | null> {
     const userId = await SecureStore.getItemAsync(USER_ID_KEY);
     return userId ? parseInt(userId, 10) : null;
+  }
+
+  async getStoredCompanyId(): Promise<number | null> {
+    const companyId = await SecureStore.getItemAsync(COMPANY_ID_KEY);
+    return companyId ? parseInt(companyId, 10) : null;
   }
 }
 

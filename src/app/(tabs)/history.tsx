@@ -94,12 +94,6 @@ export default function HistoryScreen() {
               <Text style={styles.emptySubtitle}>
                 Suas jornadas finalizadas aparecerão aqui
               </Text>
-              <TouchableOpacity
-                style={styles.emptyButton}
-                onPress={() => router.push('/(tabs)/index' as any)}
-              >
-                <Text style={styles.emptyButtonText}>Fazer primeiro pagamento</Text>
-              </TouchableOpacity>
             </View>
           ) : (
             journeys.map((journey) => (
@@ -200,6 +194,7 @@ const styles = StyleSheet.create({
     color: '#fff',
     marginTop: 24,
     marginBottom: 8,
+    textAlign: 'center',
   },
   emptySubtitle: {
     fontSize: 14,
