@@ -23,23 +23,13 @@ export default function PaymentDetailScreen() {
       try {
         const userId = await authService.getStoredUserId();
         currentUserIdRef.current = userId;
-        console.log('[PaymentDetail] User ID carregado:', userId);
       } catch (error) {
-        console.error('[PaymentDetail] Erro ao carregar user ID:', error);
+        // Erro silencioso
       }
     };
     loadUserId();
   }, []);
 
-  // Log dos parâmetros recebidos para debug
-  useEffect(() => {
-    console.log('[PaymentDetail] Parâmetros recebidos:', {
-      has_qr_code_base64: !!qrCodeBase64,
-      has_qr_code_data: !!qrCodeData,
-      has_copy_paste: !!copyPaste,
-      transaction_id: transactionId,
-    });
-  }, []);
 
   const copyToClipboard = (text: string) => {
     try {
@@ -74,17 +64,12 @@ export default function PaymentDetailScreen() {
       // Se ambos têm user_id, verificar se correspondem
       if (transactionUserId !== undefined && currentUserId !== null) {
         if (transactionUserId !== currentUserId) {
-          console.log('[PaymentDetail] Pagamento pertence a outro usuário - ignorando atualização:', {
-            transaction_user_id: transactionUserId,
-            current_user_id: currentUserId,
-          });
           return; // Não atualizar se não for do usuário atual
         }
       }
       
       // Se a transação tem user_id mas o usuário não está logado, não atualizar
       if (transactionUserId !== undefined && currentUserId === null) {
-        console.log('[PaymentDetail] Transação tem user_id mas usuário não está logado - ignorando');
         return;
       }
       
@@ -96,8 +81,6 @@ export default function PaymentDetailScreen() {
         if (intervalRef.current) {
           clearInterval(intervalRef.current);
         }
-
-        console.log('[PaymentDetail] Pagamento aprovado - navegando para tela de sucesso');
 
         // Navegar para tela de sucesso
         router.replace({
@@ -116,7 +99,6 @@ export default function PaymentDetailScreen() {
     } catch (error: any) {
       // Se for erro 403 ou 401, pode ser que a transação não pertença ao usuário
       if (error?.status === 403 || error?.status === 401) {
-        console.log('[PaymentDetail] Acesso negado - transação não pertence ao usuário atual');
         // Parar de verificar esta transação
         if (intervalRef.current) {
           clearInterval(intervalRef.current);
