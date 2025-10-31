@@ -8,7 +8,7 @@ const ENV_CONFIG = {
   development: {
     // Use uma dessas URLs para desenvolvimento
     LOCAL: 'http://localhost:8000/api/v1',
-    NGROK: 'https://34ad3b84046f.ngrok-free.app/api/v1',
+    NGROK: 'https://5a7792fcac22.ngrok-free.app/api/v1',
     IOS_SIMULATOR: 'http://127.0.0.1:8000/api/v1',
   },
   production: {
@@ -63,15 +63,6 @@ const getBaseURL = (): string => {
 // Obter URL base
 const BASE_URL = getBaseURL();
 
-// Log da configuração (apenas em desenvolvimento)
-if (isDev) {
-  console.log('📱 Configuração da API:', {
-    Ambiente: 'Development',
-    BaseURL: BASE_URL,
-    Plataforma: Platform.OS,
-  });
-}
-
 // Cria instância do Axios
 const api: AxiosInstance = axios.create({
   baseURL: BASE_URL,
@@ -91,16 +82,9 @@ api.interceptors.request.use(
       
       if (token && config.headers) {
         config.headers.Authorization = `Bearer ${token}`;
-        if (isDev) {
-          console.log(`[API] Request ${config.method?.toUpperCase()} ${config.url} - Token presente`);
-        }
-      } else {
-        if (isDev) {
-          console.log(`[API] Request ${config.method?.toUpperCase()} ${config.url} - SEM TOKEN`);
-        }
       }
     } catch (error) {
-      console.error('[API] Erro ao buscar token:', error);
+      // Silenciar erro
     }
     
     return config;
@@ -123,13 +107,10 @@ api.interceptors.response.use(
     if (error.response?.status === 401) {
       // Verificar se já tentou fazer refresh
       if (originalRequest?._retry) {
-        // Se já tentou uma vez, não tentar novamente
-        console.log('[API] Erro 401 após retry - token inválido ou expirado');
         await SecureStore.deleteItemAsync('auth_token');
         await SecureStore.deleteItemAsync('refresh_token');
         await SecureStore.deleteItemAsync('user_id');
         
-        // Retornar erro ao invés de tentar novamente
         return Promise.reject({
           status: 401,
           message: 'Não autorizado. Faça login novamente.',
@@ -144,34 +125,24 @@ api.interceptors.response.use(
         const refreshToken = await SecureStore.getItemAsync('refresh_token');
         
         if (refreshToken) {
-          console.log('[API] Tentando refresh token...');
-          // Tentar fazer refresh do token usando o endpoint padrão do Simple JWT
-          // O endpoint padrão é /api/token/refresh/ 
           try {
             const refreshResponse = await axios.post(`${BASE_URL.replace('/api/v1', '')}/api/token/refresh/`, {
               refresh: refreshToken
             });
             
             if (refreshResponse?.data?.access) {
-              // Salvar novo token
               await SecureStore.setItemAsync('auth_token', refreshResponse.data.access);
-              console.log('[API] Token atualizado com sucesso');
               
-              // Adicionar novo token à requisição original
               originalRequest.headers = originalRequest.headers || {};
               originalRequest.headers.Authorization = `Bearer ${refreshResponse.data.access}`;
               
-              // Retentar requisição original
               return api(originalRequest);
             }
-          } catch (refreshError: any) {
-            console.log('[API] Erro ao fazer refresh:', refreshError?.response?.status || refreshError?.message);
+          } catch {
             // Se o refresh falhar, continuar para limpar tokens
           }
         }
         
-        // Se não conseguiu fazer refresh, limpar tokens
-        console.log('[API] Não foi possível fazer refresh - limpando tokens');
         await SecureStore.deleteItemAsync('auth_token');
         await SecureStore.deleteItemAsync('refresh_token');
         await SecureStore.deleteItemAsync('user_id');
@@ -181,8 +152,7 @@ api.interceptors.response.use(
           message: 'Sessão expirada. Faça login novamente.',
           data: error.response?.data,
         });
-      } catch (refreshError) {
-        console.error('[API] Erro ao fazer refresh token:', refreshError);
+      } catch {
         await SecureStore.deleteItemAsync('auth_token');
         await SecureStore.deleteItemAsync('refresh_token');
         await SecureStore.deleteItemAsync('user_id');

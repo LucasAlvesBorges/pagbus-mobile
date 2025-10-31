@@ -223,6 +223,34 @@ class JourneyService {
       throw error;
     }
   }
+
+  /**
+   * Faz download do PDF de uma jornada finalizada
+   * Retorna o arrayBuffer do PDF para ser convertido em base64
+   */
+  async downloadJourneyPDF(journeyId: number): Promise<ArrayBuffer> {
+    try {
+      const token = await SecureStore.getItemAsync('auth_token');
+      const baseUrl = (await import('./api')).default.defaults.baseURL;
+      const url = `${baseUrl}${this.baseUrl}/journeys/${journeyId}/download_pdf/`;
+      
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ detail: 'Erro ao baixar PDF' }));
+        throw new Error(errorData.detail || 'Erro ao baixar PDF');
+      }
+
+      return await response.arrayBuffer();
+    } catch (error) {
+      throw error;
+    }
+  }
 }
 
 export const journeyService = new JourneyService();

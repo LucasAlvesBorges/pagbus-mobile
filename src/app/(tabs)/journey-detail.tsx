@@ -10,7 +10,12 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   RefreshControl,
+  Alert,
 } from 'react-native';
+import * as FileSystem from 'expo-file-system';
+import * as Sharing from 'expo-sharing';
+// Importar API legada explicitamente para evitar bloqueio
+import { writeAsStringAsync } from 'expo-file-system/legacy';
 import { journeyService, type Journey } from '../../services/journeyService';
 import { formatCurrencyWithSymbol } from '../../utils/currency';
 import { formatDateToBrasilia } from '../../utils/date';
@@ -34,6 +39,7 @@ export default function JourneyDetailScreen() {
   const [payments, setPayments] = useState<Payment[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [downloadingPDF, setDownloadingPDF] = useState(false);
 
   useEffect(() => {
     loadJourneyDetails();
@@ -70,6 +76,83 @@ export default function JourneyDetailScreen() {
 
   const handleGoBack = () => {
     router.push('/(tabs)/history');
+  };
+
+  const handleDownloadPDF = async () => {
+    if (!journey || !journey.finalizada) {
+      Alert.alert('Aviso', 'A jornada precisa estar finalizada para baixar o PDF.');
+      return;
+    }
+
+    try {
+      setDownloadingPDF(true);
+      
+      const arrayBuffer = await journeyService.downloadJourneyPDF(journeyId);
+      
+      const dateStr = journey.finalized_at 
+        ? new Date(journey.finalized_at).toISOString().split('T')[0].replace(/-/g, '')
+        : new Date().toISOString().split('T')[0].replace(/-/g, '');
+      const filename = `jornada_${journey.id}_${dateStr}.pdf`;
+      
+      // Converter ArrayBuffer para base64
+      const bytes = new Uint8Array(arrayBuffer);
+      let binary = '';
+      for (let i = 0; i < bytes.length; i++) {
+        binary += String.fromCharCode(bytes[i]);
+      }
+      const base64 = btoa(binary);
+      
+      let fileUri: string;
+      
+      try {
+        const cacheDir = FileSystem.Directory.cache;
+        
+        if (!cacheDir) {
+          throw new Error('Cache directory não disponível');
+        }
+        
+        fileUri = `${cacheDir}/${filename}`;
+        
+        await writeAsStringAsync(fileUri, base64, {
+          encoding: 'base64',
+        });
+        
+        const fileInfo = await FileSystem.getInfoAsync(fileUri);
+        
+        if (!fileInfo.exists) {
+          throw new Error('Arquivo não foi criado');
+        }
+      } catch {
+        // Fallback: usar path do cache diretamente
+        const hardcodedPath = `file:///data/data/com.pagbus.mobile/cache/${filename}`;
+        fileUri = hardcodedPath;
+        
+        await writeAsStringAsync(fileUri, base64, {
+          encoding: 'base64',
+        });
+      }
+      
+      // Compartilhar o arquivo
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(fileUri, {
+          mimeType: 'application/pdf',
+          dialogTitle: 'Compartilhar PDF da Jornada',
+          UTI: 'com.adobe.pdf',
+        });
+      } else {
+        Alert.alert(
+          'Compartilhamento não disponível',
+          'Não foi possível compartilhar o PDF neste dispositivo.'
+        );
+      }
+    } catch (error: any) {
+      Alert.alert(
+        'Erro',
+        'Não foi possível gerar o PDF. Tente novamente.'
+      );
+    } finally {
+      setDownloadingPDF(false);
+    }
   };
 
   if (loading) {
@@ -138,9 +221,25 @@ export default function JourneyDetailScreen() {
           <View style={styles.journeyInfoHeader}>
             <Ionicons name="receipt-outline" size={32} color="#27C992" />
             <View style={styles.journeyInfoText}>
-              <Text style={styles.journeyInfoTitle}>
-                {journey.bus_line_name || 'Jornada'}
-              </Text>
+              <View style={styles.journeyTitleRow}>
+                <Text style={styles.journeyInfoTitle}>
+                  {journey.bus_line_name || 'Jornada'}
+                </Text>
+                {journey.finalizada && (
+                  <TouchableOpacity
+                    onPress={handleDownloadPDF}
+                    disabled={downloadingPDF}
+                    style={styles.downloadButton}
+                    activeOpacity={0.7}
+                  >
+                    {downloadingPDF ? (
+                      <ActivityIndicator size="small" color="#27C992" />
+                    ) : (
+                      <Ionicons name="download-outline" size={20} color="#27C992" />
+                    )}
+                  </TouchableOpacity>
+                )}
+              </View>
               {journey.bus_line_code && (
                 <Text style={styles.journeyInfoSubtitle}>
                   Código: {journey.bus_line_code}
@@ -349,11 +448,25 @@ const styles = StyleSheet.create({
     flex: 1,
     marginLeft: 12,
   },
+  journeyTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+  },
   journeyInfoTitle: {
     fontSize: 18,
     fontWeight: '700',
     color: '#fff',
-    marginBottom: 4,
+    flex: 1,
+  },
+  downloadButton: {
+    padding: 8,
+    marginLeft: 8,
+    borderRadius: 8,
+    backgroundColor: '#27C99220',
+    borderWidth: 1,
+    borderColor: '#27C99240',
   },
   journeyInfoSubtitle: {
     fontSize: 14,
