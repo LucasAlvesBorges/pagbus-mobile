@@ -21,7 +21,6 @@ export interface Journey {
   opened_hours: string | null;
   opened_hours_display: string | null;
   payments_count: number;
-  pdf: string | null;
   created_at: string;
   finalized_at: string | null;
   updated_at: string;

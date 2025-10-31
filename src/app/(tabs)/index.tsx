@@ -222,8 +222,11 @@ export default function PaymentScreen() {
     try {
       setStartingJourney(true); // Reutilizar o estado de loading
       
+      // Salvar o ID da jornada ativa antes de qualquer operação
+      const journeyIdToFinalize = activeJourney.id;
+      
       // Finalizar jornada na API (pode retornar null se foi deletada)
-      const finalizedJourney = await journeyService.finalizeJourney(activeJourney.id);
+      const finalizedJourney = await journeyService.finalizeJourney(journeyIdToFinalize);
       
       // Limpar jornada ativa
       setActiveJourney(null);
@@ -233,17 +236,18 @@ export default function PaymentScreen() {
       setSelection(null);
       setSelectedTariff(null);
       
-      // Mostrar mensagem apropriada
+      // Mostrar mensagem apropriada e redirecionar se necessário
       if (finalizedJourney === null) {
         Alert.alert(
           'Sucesso',
           'Jornada removida (sem pagamentos).'
         );
       } else {
-        Alert.alert(
-          'Sucesso',
-          'Jornada finalizada com sucesso!'
-        );
+        // Garantir que estamos usando o ID correto da jornada finalizada
+        const finalizedId = finalizedJourney.id;
+        
+        // Redirecionar para a tela de detalhes da jornada finalizada
+        router.push(`/(tabs)/journey-detail?journeyId=${finalizedId}` as any);
       }
     } catch (error: any) {
       Alert.alert(

@@ -218,12 +218,19 @@ export default function JourneyDetailScreen() {
       <View style={styles.content}>
         {/* Informações da Jornada */}
         <View style={styles.journeyInfoBox}>
+          <Text style={styles.journeyId}>
+            Jornada #{journey.id}
+          </Text>
+          
           <View style={styles.journeyInfoHeader}>
             <Ionicons name="receipt-outline" size={32} color="#27C992" />
             <View style={styles.journeyInfoText}>
               <View style={styles.journeyTitleRow}>
                 <Text style={styles.journeyInfoTitle}>
                   {journey.bus_line_name || 'Jornada'}
+                  {journey.bus_line_code && (
+                    <Text style={styles.busLineCode}> ({journey.bus_line_code})</Text>
+                  )}
                 </Text>
                 {journey.finalizada && (
                   <TouchableOpacity
@@ -240,11 +247,6 @@ export default function JourneyDetailScreen() {
                   </TouchableOpacity>
                 )}
               </View>
-              {journey.bus_line_code && (
-                <Text style={styles.journeyInfoSubtitle}>
-                  Código: {journey.bus_line_code}
-                </Text>
-              )}
               {journey.vehicle_prefix && (
                 <Text style={styles.journeyInfoSubtitle}>
                   Veículo: {journey.vehicle_prefix}
@@ -460,6 +462,11 @@ const styles = StyleSheet.create({
     color: '#fff',
     flex: 1,
   },
+  busLineCode: {
+    fontSize: 18,
+    fontWeight: '400',
+    color: '#A5DCC6',
+  },
   downloadButton: {
     padding: 8,
     marginLeft: 8,
@@ -471,6 +478,13 @@ const styles = StyleSheet.create({
   journeyInfoSubtitle: {
     fontSize: 14,
     color: '#A5DCC6',
+  },
+  journeyId: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#27C992',
+    textAlign: 'center',
+    marginBottom: 12,
   },
   journeyStats: {
     flexDirection: 'row',
