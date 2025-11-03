@@ -1,6 +1,6 @@
-import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse, AxiosError } from 'axios';
-import * as SecureStore from 'expo-secure-store';
+import axios, { AxiosError, AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios';
 import Constants from 'expo-constants';
+import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
 
 // Configuração de URLs por ambiente
@@ -13,7 +13,7 @@ const ENV_CONFIG = {
   },
   production: {
     // Adicione a URL de produção aqui quando estiver pronto
-    MAIN: 'https://api.pagbus.com.br/api/v1',
+    MAIN: 'https://pagbus.com/api/v1',
   },
 };
 
