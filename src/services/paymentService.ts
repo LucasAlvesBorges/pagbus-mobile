@@ -131,6 +131,83 @@ class PaymentService {
       throw error;
     }
   }
+
+  /**
+   * Cria um TransactionHistory de gratuidade (passagem gratuita)
+   */
+  async createGratuidade(data: {
+    company_id: number;
+    user_id?: number;
+    journey_id?: number;
+    bus_line_id?: string;
+    vehicle_prefix?: string;
+    image: string; // URI da imagem
+  }) {
+    try {
+      // Criar FormData para enviar a imagem
+      const formData = new FormData();
+      
+      // Adicionar campos ao FormData
+      formData.append('company_id', data.company_id.toString());
+      
+      if (data.user_id) {
+        formData.append('user_id', data.user_id.toString());
+      }
+      
+      if (data.journey_id) {
+        formData.append('journey_id', data.journey_id.toString());
+      }
+      
+      if (data.bus_line_id) {
+        formData.append('bus_line_id', data.bus_line_id);
+      }
+      
+      if (data.vehicle_prefix) {
+        formData.append('vehicle_prefix', data.vehicle_prefix);
+      }
+      
+      // Adicionar a imagem
+      // A URI pode ser file:// ou content:// no React Native
+      const imageUri = data.image;
+      const filename = imageUri.split('/').pop() || 'photo.jpg';
+      const match = /\.(\w+)$/.exec(filename);
+      const type = match ? `image/${match[1]}` : 'image/jpeg';
+      
+      formData.append('image', {
+        uri: imageUri,
+        name: filename,
+        type: type,
+      } as any);
+      
+      // Fazer requisição com FormData
+      // Precisamos usar axios diretamente para enviar FormData
+      const axios = (await import('axios')).default;
+      
+      // Obter token de autenticação
+      const { getItemAsync } = await import('expo-secure-store');
+      const token = await getItemAsync('auth_token');
+      
+      // Obter baseURL do api (usando a mesma lógica do api.ts)
+      const apiModule = await import('./api');
+      const apiInstance = apiModule.default;
+      const baseURL = apiInstance.defaults?.baseURL || 'http://localhost:8000/api/v1';
+      
+      const response = await axios.post(
+        `${baseURL}${this.baseUrl}/history/create_gratuidade/`,
+        formData,
+        {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+            ...(token && { Authorization: `Bearer ${token}` }),
+          },
+        }
+      );
+      
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  }
 }
 
 // Exportar instância singleton

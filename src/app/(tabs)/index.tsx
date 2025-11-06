@@ -2,7 +2,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState, useCallback } from 'react';
-import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View, ActivityIndicator } from 'react-native';
+import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View, ActivityIndicator, Modal, Image } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
 import { PaymentRequest, paymentService } from '../../services/paymentService';
 import { buslineService, Tariff } from '../../services/buslineService';
 import { authService } from '../../services/authService';
@@ -22,6 +23,9 @@ export default function PaymentScreen() {
   const [activeJourney, setActiveJourney] = useState<any>(null);
   const [startingJourney, setStartingJourney] = useState(false);
   const [generatingQRCode, setGeneratingQRCode] = useState(false);
+  const [isGratuidade, setIsGratuidade] = useState(false);
+  const [photoModalVisible, setPhotoModalVisible] = useState(false);
+  const [capturedPhoto, setCapturedPhoto] = useState<string | null>(null);
 
   // Carregar seleção salva quando a tela ganhar foco
   useFocusEffect(
@@ -97,15 +101,121 @@ export default function PaymentScreen() {
   };
 
   const handleIncreaseQuantity = () => {
-    setQuantity(prev => Math.min(prev + 1, 99));
+    if (!isGratuidade) {
+      setQuantity(prev => Math.min(prev + 1, 99));
+    }
   };
 
   const handleDecreaseQuantity = () => {
-    setQuantity(prev => Math.max(prev - 1, 1));
+    if (!isGratuidade) {
+      setQuantity(prev => Math.max(prev - 1, 1));
+    }
   };
 
   const handleSelectTariff = (tariff: Tariff) => {
     setSelectedTariff(tariff);
+    setIsGratuidade(false); // Desativar gratuidade ao selecionar uma tarifa
+  };
+
+  const handleSelectGratuidade = () => {
+    setIsGratuidade(true);
+    setSelectedTariff(null); // Limpar tarifa selecionada ao ativar gratuidade
+    setQuantity(1);
+  };
+
+  const handleTakePhoto = async () => {
+    try {
+      // Solicitar permissão da câmera
+      const { status } = await ImagePicker.requestCameraPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permissão necessária', 'Precisamos de permissão para acessar a câmera.');
+        return;
+      }
+
+      // Abrir a câmera
+      const result = await ImagePicker.launchCameraAsync({
+        mediaTypes: ['images'],
+        allowsEditing: false,
+        quality: 1,
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        // Mostrar foto no modal de confirmação
+        setCapturedPhoto(result.assets[0].uri);
+        setPhotoModalVisible(true);
+      }
+    } catch (error: any) {
+      Alert.alert('Erro', 'Não foi possível abrir a câmera. ' + (error?.message || ''));
+    }
+  };
+
+  const handleConfirmPhoto = async () => {
+    if (!capturedPhoto) {
+      Alert.alert('Erro', 'Nenhuma foto para enviar.');
+      return;
+    }
+
+    if (!selection) {
+      Alert.alert('Aviso', 'Por favor, selecione uma linha e veículo.');
+      return;
+    }
+
+    try {
+      setGeneratingQRCode(true);
+      
+      // Obter company_id
+      let companyId: number;
+      try {
+        const storedCompanyId = await authService.getStoredCompanyId();
+        if (storedCompanyId) {
+          companyId = storedCompanyId;
+        } else {
+          // Fallback: usar busLineCompany
+          companyId = parseInt(selection.busLineCompany) || 1;
+        }
+      } catch {
+        // Fallback: usar busLineCompany
+        companyId = parseInt(selection.busLineCompany) || 1;
+      }
+
+      // Obter user_id
+      const userId = await authService.getStoredUserId();
+      
+      // Obter journey_id se houver jornada ativa
+      const journeyId = activeJourney?.id;
+
+      // Preparar dados para envio
+      const gratuidadeData = {
+        company_id: companyId,
+        user_id: userId || undefined,
+        journey_id: journeyId || undefined,
+        bus_line_id: selection.busLineId || undefined,
+        vehicle_prefix: selection.vehiclePrefix || undefined,
+        image: capturedPhoto,
+      };
+
+      // Enviar para o backend
+      await paymentService.createGratuidade(gratuidadeData);
+
+      // Fechar modal e limpar
+      setPhotoModalVisible(false);
+      setCapturedPhoto(null);
+      Alert.alert('Sucesso', 'Gratuidade registrada com sucesso!');
+    } catch (error: any) {
+      Alert.alert(
+        'Erro',
+        error?.message || 'Não foi possível registrar a gratuidade. Verifique sua conexão.'
+      );
+    } finally {
+      setGeneratingQRCode(false);
+    }
+  };
+
+  const handleRetakePhoto = () => {
+    setPhotoModalVisible(false);
+    setCapturedPhoto(null);
+    // Tirar outra foto
+    handleTakePhoto();
   };
 
   const handleGenerateQRCode = async () => {
@@ -414,30 +524,57 @@ export default function PaymentScreen() {
               </View>
             </View>
           ) : (
-            <View style={styles.tariffGrid}>
-              {tariffs.map((tariff) => (
-                <TouchableOpacity
-                  key={tariff.id}
-                  style={[
-                    styles.tariffGridButton,
-                    selectedTariff?.id === tariff.id && styles.tariffGridButtonSelected,
-                    !activeJourney && styles.tariffGridButtonDisabled,
-                  ]}
-                  onPress={() => handleSelectTariff(tariff)}
-                  disabled={!activeJourney}
-                >
-                  <Text
+            <>
+              <View>
+                <View style={styles.tariffGrid}>
+                  {tariffs.map((tariff) => (
+                    <TouchableOpacity
+                      key={tariff.id}
+                      style={[
+                        styles.tariffGridButton,
+                        selectedTariff?.id === tariff.id && !isGratuidade && styles.tariffGridButtonSelected,
+                        !activeJourney && styles.tariffGridButtonDisabled,
+                      ]}
+                      onPress={() => handleSelectTariff(tariff)}
+                      disabled={!activeJourney}
+                    >
+                      <Text
+                        style={[
+                          styles.tariffGridButtonText,
+                          selectedTariff?.id === tariff.id && !isGratuidade && styles.tariffGridButtonTextSelected,
+                          !activeJourney && styles.tariffGridButtonTextDisabled,
+                        ]}
+                      >
+                        {formatCurrencyWithSymbol(tariff.value)}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+                {activeJourney && (
+                  <TouchableOpacity
                     style={[
-                      styles.tariffGridButtonText,
-                      selectedTariff?.id === tariff.id && styles.tariffGridButtonTextSelected,
-                      !activeJourney && styles.tariffGridButtonTextDisabled,
+                      styles.gratuidadeButtonFullWidth,
+                      isGratuidade && styles.gratuidadeButtonSelected,
+                      !activeJourney && styles.tariffGridButtonDisabled,
                     ]}
+                    onPress={handleSelectGratuidade}
+                    disabled={!activeJourney}
                   >
-                    {formatCurrencyWithSymbol(tariff.value)}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
+                    <View style={styles.gratuidadeButtonContent}>
+                      <Text
+                        style={[
+                          styles.tariffGridButtonText,
+                          isGratuidade && styles.gratuidadeButtonTextSelected,
+                          !activeJourney && styles.tariffGridButtonTextDisabled,
+                        ]}
+                      >
+                        Gratuidade
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+                )}
+              </View>
+            </>
           )}
         </View>
 
@@ -448,14 +585,14 @@ export default function PaymentScreen() {
             <TouchableOpacity
               style={[
                 styles.quantityStepperButton,
-                !activeJourney && styles.quantityStepperButtonDisabled,
+                (!activeJourney || isGratuidade) && styles.quantityStepperButtonDisabled,
               ]}
               onPress={handleDecreaseQuantity}
-              disabled={!activeJourney}
+              disabled={!activeJourney || isGratuidade}
             >
               <Text style={[
                 styles.quantityStepperText,
-                !activeJourney && styles.quantityStepperTextDisabled,
+                (!activeJourney || isGratuidade) && styles.quantityStepperTextDisabled,
               ]}>-</Text>
             </TouchableOpacity>
             <View style={styles.quantityDisplay}>
@@ -464,14 +601,14 @@ export default function PaymentScreen() {
             <TouchableOpacity
               style={[
                 styles.quantityStepperButton,
-                !activeJourney && styles.quantityStepperButtonDisabled,
+                (!activeJourney || isGratuidade) && styles.quantityStepperButtonDisabled,
               ]}
               onPress={handleIncreaseQuantity}
-              disabled={!activeJourney}
+              disabled={!activeJourney || isGratuidade}
             >
               <Text style={[
                 styles.quantityStepperText,
-                !activeJourney && styles.quantityStepperTextDisabled,
+                (!activeJourney || isGratuidade) && styles.quantityStepperTextDisabled,
               ]}>+</Text>
             </TouchableOpacity>
           </View>
@@ -481,31 +618,127 @@ export default function PaymentScreen() {
         <View style={styles.totalCardWrapper}>
           <View style={styles.totalCard}>
             <Text style={styles.totalLabel}>Total a Pagar:</Text>
-            <Text style={styles.totalValue}>{formatCurrencyWithSymbol(selectedTariff ? parseFloat(selectedTariff.value) * quantity : 0)}</Text>
+            <Text style={styles.totalValue}>
+              {isGratuidade 
+                ? formatCurrencyWithSymbol(0) 
+                : formatCurrencyWithSymbol(selectedTariff ? parseFloat(selectedTariff.value) * quantity : 0)
+              }
+            </Text>
           </View>
         </View>
       </View>
 
-      {/* Botão Gerar QR Code */}
+      {/* Botão Gerar QR Code / Tirar Foto */}
       <View style={styles.bottomButtonContainer}>
         <TouchableOpacity
           style={[
             styles.generateQrCodeButton,
-            (!selectedTariff || loading || !selection || !activeJourney || generatingQRCode) && styles.generateQrCodeButtonDisabled
+            isGratuidade && styles.generateQrCodeButtonGratuidade,
+            (!selectedTariff || loading || !selection || !activeJourney || generatingQRCode) && !isGratuidade && styles.generateQrCodeButtonDisabled,
+            isGratuidade && (!selection || !activeJourney) && styles.generateQrCodeButtonDisabled,
           ]}
-          onPress={handleGenerateQRCode}
-          disabled={!selectedTariff || loading || !selection || !activeJourney || generatingQRCode}
+          onPress={isGratuidade ? handleTakePhoto : handleGenerateQRCode}
+          disabled={
+            isGratuidade 
+              ? (!selection || !activeJourney)
+              : (!selectedTariff || loading || !selection || !activeJourney || generatingQRCode)
+          }
         >
           {generatingQRCode ? (
             <View style={styles.buttonContent}>
-              <ActivityIndicator size="small" color="#fff" style={styles.buttonSpinner} />
-              <Text style={styles.generateQrCodeButtonText}>Gerando...</Text>
+              <ActivityIndicator size="small" color={isGratuidade ? "#000" : "#fff"} style={styles.buttonSpinner} />
+              <Text style={[
+                styles.generateQrCodeButtonText,
+                isGratuidade && styles.generateQrCodeButtonTextGratuidade
+              ]}>
+                {isGratuidade ? 'Enviando...' : 'Gerando...'}
+              </Text>
             </View>
           ) : (
-            <Text style={styles.generateQrCodeButtonText}>Gerar QR Code</Text>
+            <Text style={[
+              styles.generateQrCodeButtonText,
+              isGratuidade && styles.generateQrCodeButtonTextGratuidade
+            ]}>
+              {isGratuidade ? 'Tirar Foto' : 'Gerar QR Code'}
+            </Text>
           )}
         </TouchableOpacity>
       </View>
+
+      {/* Modal de Confirmação da Foto */}
+      <Modal
+        visible={photoModalVisible}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => {
+          if (!generatingQRCode) {
+            setPhotoModalVisible(false);
+            setCapturedPhoto(null);
+          }
+        }}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <View style={styles.modalHeaderSpacer} />
+              <Text style={styles.modalTitle}>Confirmar Foto</Text>
+              <TouchableOpacity
+                style={styles.modalCloseButton}
+                onPress={() => {
+                  if (!generatingQRCode) {
+                    setPhotoModalVisible(false);
+                    setCapturedPhoto(null);
+                  }
+                }}
+                disabled={generatingQRCode}
+              >
+                <Ionicons name="close" size={24} color="#fff" />
+              </TouchableOpacity>
+            </View>
+            
+            {capturedPhoto && (
+              <Image 
+                source={{ uri: capturedPhoto }} 
+                style={styles.modalImage}
+                resizeMode="contain"
+              />
+            )}
+
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={[
+                  styles.modalButton,
+                  styles.modalButtonRetake,
+                  generatingQRCode && styles.modalButtonDisabled
+                ]}
+                onPress={handleRetakePhoto}
+                disabled={generatingQRCode}
+              >
+                <Text style={styles.modalButtonTextRetake}>Tirar Outra</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={[
+                  styles.modalButton,
+                  styles.modalButtonConfirm,
+                  generatingQRCode && styles.modalButtonDisabled
+                ]}
+                onPress={handleConfirmPhoto}
+                disabled={generatingQRCode}
+              >
+                {generatingQRCode ? (
+                  <View style={styles.modalButtonContent}>
+                    <ActivityIndicator size="small" color="#fff" style={styles.modalButtonSpinner} />
+                    <Text style={styles.modalButtonTextConfirm}>Enviando...</Text>
+                  </View>
+                ) : (
+                  <Text style={styles.modalButtonTextConfirm}>Confirmar</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </ScrollView>
   );
 }
@@ -692,6 +925,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     gap: 8,
+    marginBottom: 8,
   },
   tariffGridButton: {
     flex: 1,
@@ -833,6 +1067,10 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     elevation: 2,
   },
+  generateQrCodeButtonGratuidade: {
+    backgroundColor: '#FFC107',
+    shadowColor: '#FFC107',
+  },
   buttonContent: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -845,5 +1083,126 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
     color: '#fff',
+  },
+  generateQrCodeButtonTextGratuidade: {
+    color: '#000',
+  },
+  gratuidadeButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  gratuidadeButtonFullWidth: {
+    width: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 8,
+    height: 48,
+    backgroundColor: '#122017',
+    borderWidth: 1,
+    borderColor: '#27C992',
+  },
+  gratuidadeButtonSelected: {
+    backgroundColor: '#FFC107',
+    borderColor: '#FFC107',
+  },
+  gratuidadeButtonTextSelected: {
+    color: '#000',
+    fontWeight: '600',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  modalContent: {
+    backgroundColor: '#111C20',
+    borderRadius: 16,
+    padding: 24,
+    width: '100%',
+    maxWidth: 400,
+    alignItems: 'center',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    width: '100%',
+    marginBottom: 20,
+    position: 'relative',
+  },
+  modalHeaderSpacer: {
+    width: 32,
+    height: 32,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#fff',
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    textAlign: 'center',
+  },
+  modalCloseButton: {
+    padding: 4,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    width: 32,
+    height: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalImage: {
+    width: '100%',
+    height: 300,
+    borderRadius: 12,
+    marginBottom: 24,
+    backgroundColor: '#122017',
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    gap: 12,
+    width: '100%',
+  },
+  modalButton: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalButtonRetake: {
+    backgroundColor: '#122017',
+    borderWidth: 1,
+    borderColor: '#27C992',
+  },
+  modalButtonConfirm: {
+    backgroundColor: '#27C992',
+  },
+  modalButtonTextRetake: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#27C992',
+  },
+  modalButtonTextConfirm: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#fff',
+  },
+  modalButtonDisabled: {
+    opacity: 0.6,
+  },
+  modalButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  modalButtonSpinner: {
+    marginRight: 4,
   },
 });
