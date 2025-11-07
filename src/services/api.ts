@@ -8,7 +8,7 @@ const ENV_CONFIG = {
   development: {
     // Use uma dessas URLs para desenvolvimento
     LOCAL: 'http://localhost:8000/api/v1',
-    NGROK: 'https://5a7792fcac22.ngrok-free.app/api/v1',
+    NGROK: 'https://f341f26c0502.ngrok-free.app/api/v1',
     IOS_SIMULATOR: 'http://127.0.0.1:8000/api/v1',
   },
   production: {
