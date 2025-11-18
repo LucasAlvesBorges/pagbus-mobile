@@ -11,14 +11,20 @@ import {
   ActivityIndicator,
   RefreshControl,
   Alert,
+  Platform,
 } from 'react-native';
 import * as FileSystem from 'expo-file-system';
+import {
+  cacheDirectory,
+  writeAsStringAsync,
+  getInfoAsync,
+  EncodingType,
+} from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
-// Importar API legada explicitamente para evitar bloqueio
-import { writeAsStringAsync } from 'expo-file-system/legacy';
 import { journeyService, type Journey } from '../../services/journeyService';
 import { formatCurrencyWithSymbol } from '../../utils/currency';
 import { formatDateToBrasilia } from '../../utils/date';
+import { formatBusLineName } from '../../utils/busLine';
 
 interface Payment {
   id: number;
@@ -94,42 +100,54 @@ export default function JourneyDetailScreen() {
         : new Date().toISOString().split('T')[0].replace(/-/g, '');
       const filename = `jornada_${journey.id}_${dateStr}.pdf`;
       
-      // Converter ArrayBuffer para base64
-      const bytes = new Uint8Array(arrayBuffer);
-      let binary = '';
-      for (let i = 0; i < bytes.length; i++) {
-        binary += String.fromCharCode(bytes[i]);
-      }
-      const base64 = btoa(binary);
-      
-      let fileUri: string;
-      
-      try {
-        const cacheDir = FileSystem.Directory.cache;
-        
+      const base64 = arrayBufferToBase64(arrayBuffer);
+      let fileUri = '';
+
+      if (Platform.OS === 'ios') {
+        const cacheDir = cacheDirectory;
+
         if (!cacheDir) {
-          throw new Error('Cache directory não disponível');
+          throw new Error('Diretório de cache não disponível');
         }
-        
-        fileUri = `${cacheDir}/${filename}`;
-        
+
+        fileUri = `${cacheDir}${filename}`;
+
         await writeAsStringAsync(fileUri, base64, {
-          encoding: 'base64',
+          encoding: EncodingType.Base64,
         });
-        
-        const fileInfo = await FileSystem.getInfoAsync(fileUri);
-        
+
+        const fileInfo = await getInfoAsync(fileUri);
+
         if (!fileInfo.exists) {
           throw new Error('Arquivo não foi criado');
         }
-      } catch {
-        // Fallback: usar path do cache diretamente
-        const hardcodedPath = `file:///data/data/com.pagbus.mobile/cache/${filename}`;
-        fileUri = hardcodedPath;
-        
-        await writeAsStringAsync(fileUri, base64, {
-          encoding: 'base64',
-        });
+      } else {
+        try {
+          const cacheDir = (FileSystem as any).Directory?.cache;
+
+          if (!cacheDir) {
+            throw new Error('Cache directory não disponível');
+          }
+
+          fileUri = `${cacheDir}/${filename}`;
+
+          await writeAsStringAsync(fileUri, base64, {
+            encoding: EncodingType.Base64,
+          });
+
+          const fileInfo = await FileSystem.getInfoAsync(fileUri);
+
+          if (!fileInfo.exists) {
+            throw new Error('Arquivo não foi criado');
+          }
+        } catch {
+          const hardcodedPath = `file:///data/data/com.pagbus.mobile/cache/${filename}`;
+          fileUri = hardcodedPath;
+
+          await writeAsStringAsync(fileUri, base64, {
+            encoding: EncodingType.Base64,
+          });
+        }
       }
       
       // Compartilhar o arquivo
@@ -158,7 +176,7 @@ export default function JourneyDetailScreen() {
   if (loading) {
     return (
       <View style={styles.container}>
-        <StatusBar style="dark" />
+        <StatusBar style="dark" hidden />
         <View style={styles.header}>
           <TouchableOpacity onPress={handleGoBack} style={styles.backButton}>
             <Ionicons name="arrow-back" size={24} color="#fff" />
@@ -177,7 +195,7 @@ export default function JourneyDetailScreen() {
   if (!journey) {
     return (
       <View style={styles.container}>
-        <StatusBar style="dark" />
+        <StatusBar style="dark" hidden />
         <View style={styles.header}>
           <TouchableOpacity onPress={handleGoBack} style={styles.backButton}>
             <Ionicons name="arrow-back" size={24} color="#fff" />
@@ -203,7 +221,7 @@ export default function JourneyDetailScreen() {
         <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
       }
     >
-      <StatusBar style="dark" />
+      <StatusBar style="dark" hidden />
       
       {/* Header */}
       <View style={styles.header}>
@@ -227,7 +245,7 @@ export default function JourneyDetailScreen() {
             <View style={styles.journeyInfoText}>
               <View style={styles.journeyTitleRow}>
                 <Text style={styles.journeyInfoTitle}>
-                  {journey.bus_line_name || 'Jornada'}
+                  {formatBusLineName(journey.bus_line_name, 'Jornada')}
                   {journey.bus_line_code && (
                     <Text style={styles.busLineCode}> ({journey.bus_line_code})</Text>
                   )}
@@ -309,7 +327,7 @@ export default function JourneyDetailScreen() {
                 <View style={styles.paymentHeader}>
                   <View style={styles.paymentInfo}>
                     <Text style={styles.paymentTitle}>
-                      {payment.bus_line || 'Pagamento'}
+                      {formatBusLineName(payment.bus_line, 'Pagamento')}
                     </Text>
                     {payment.vehicle && (
                       <Text style={styles.paymentSubtitle}>
@@ -364,6 +382,29 @@ export default function JourneyDetailScreen() {
       </View>
     </ScrollView>
   );
+}
+
+const base64Chars =
+  'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=';
+
+function arrayBufferToBase64(buffer: ArrayBuffer): string {
+  const bytes = new Uint8Array(buffer);
+  let base64 = '';
+
+  for (let i = 0; i < bytes.length; i += 3) {
+    const byte1 = bytes[i];
+    const byte2 = i + 1 < bytes.length ? bytes[i + 1] : 0;
+    const byte3 = i + 2 < bytes.length ? bytes[i + 2] : 0;
+
+    const triplet = (byte1 << 16) | (byte2 << 8) | byte3;
+
+    base64 += base64Chars[(triplet >> 18) & 0x3f];
+    base64 += base64Chars[(triplet >> 12) & 0x3f];
+    base64 += i + 1 < bytes.length ? base64Chars[(triplet >> 6) & 0x3f] : '=';
+    base64 += i + 2 < bytes.length ? base64Chars[triplet & 0x3f] : '=';
+  }
+
+  return base64;
 }
 
 const styles = StyleSheet.create({
@@ -592,4 +633,3 @@ const styles = StyleSheet.create({
     color: '#27C992',
   },
 });
-

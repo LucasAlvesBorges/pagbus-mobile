@@ -230,7 +230,7 @@ class JourneyService {
   async downloadJourneyPDF(journeyId: number): Promise<ArrayBuffer> {
     try {
       const token = await SecureStore.getItemAsync('auth_token');
-      const baseUrl = (await import('./api')).default.defaults.baseURL;
+      const baseUrl = (await import('./api')).default.defaults.baseURL?.replace(/\/+$/, '');
       const url = `${baseUrl}${this.baseUrl}/journeys/${journeyId}/download_pdf/`;
       
       const response = await fetch(url, {

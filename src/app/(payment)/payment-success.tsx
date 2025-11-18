@@ -17,7 +17,7 @@ export default function PaymentSuccessScreen() {
 
   return (
     <View style={styles.container}>
-      <StatusBar style="dark" />
+      <StatusBar style="dark" hidden />
 
       <ScrollView style={styles.content} contentContainerStyle={styles.contentContainer}>
         {/* Ícone de sucesso animado */}
@@ -225,4 +225,3 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 });
-

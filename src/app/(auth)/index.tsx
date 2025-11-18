@@ -124,7 +124,7 @@ export default function LoginScreen() {
 
   return (
     <View style={styles.container}>
-      <StatusBar style="dark" />
+      <StatusBar style="dark" hidden />
 
       <KeyboardAvoidingView
         style={styles.flex}

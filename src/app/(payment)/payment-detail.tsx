@@ -130,7 +130,7 @@ export default function PaymentDetailScreen() {
 
   return (
     <View style={styles.container}>
-      <StatusBar style="dark" />
+      <StatusBar style="dark" hidden />
       
       {/* Header */}
       <View style={styles.header}>
@@ -385,4 +385,3 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 } as const);
-

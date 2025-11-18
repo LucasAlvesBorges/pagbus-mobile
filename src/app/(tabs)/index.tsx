@@ -10,6 +10,7 @@ import { authService } from '../../services/authService';
 import { selectionService, BusSelection } from '../../services/selectionService';
 import { journeyService } from '../../services/journeyService';
 import { formatCurrency, formatCurrencyWithSymbol } from '../../utils/currency';
+import { formatBusLineName } from '../../utils/busLine';
 
 export default function PaymentScreen() {
   const router = useRouter();
@@ -426,7 +427,7 @@ export default function PaymentScreen() {
 
   return (
     <ScrollView style={styles.container}>
-      <StatusBar style="dark" />
+      <StatusBar style="dark" hidden />
 
       {/* Header */}
       <View style={styles.header}>
@@ -443,7 +444,9 @@ export default function PaymentScreen() {
           <View style={styles.selectedInfoBox}>
             <Ionicons name="checkmark-circle" size={24} color="#27C992" />
             <View style={styles.selectedInfo}>
-              <Text style={styles.selectedText}>{selection.busLineName}</Text>
+              <Text style={styles.selectedText}>
+                {formatBusLineName(selection.busLineName, 'Linha não informada')}
+              </Text>
               <Text style={styles.selectedSubText}>Veículo: {selection.vehiclePrefix}</Text>
               {activeJourney && (
                 <>

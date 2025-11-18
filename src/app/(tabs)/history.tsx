@@ -14,6 +14,7 @@ import {
 import { journeyService, type Journey } from '../../services/journeyService';
 import { formatCurrencyWithSymbol } from '../../utils/currency';
 import { formatDateToBrasilia } from '../../utils/date';
+import { formatBusLineName } from '../../utils/busLine';
 
 export default function HistoryScreen() {
   const router = useRouter();
@@ -66,7 +67,7 @@ export default function HistoryScreen() {
 
   return (
     <View style={styles.container}>
-      <StatusBar style="dark" />
+      <StatusBar style="dark" hidden />
 
       {/* Header */}
       <View style={styles.header}>
@@ -106,7 +107,7 @@ export default function HistoryScreen() {
                 <View style={styles.journeyHeader}>
                   <View style={styles.journeyInfo}>
                     <Text style={styles.journeyTitle}>
-                      {journey.bus_line_name || 'Jornada'}
+                      {formatBusLineName(journey.bus_line_name, 'Jornada')}
                     </Text>
                     {journey.vehicle_prefix && (
                       <Text style={styles.journeySubtitle}>
@@ -273,4 +274,3 @@ const styles = StyleSheet.create({
     color: '#A5DCC6',
   },
 });
-

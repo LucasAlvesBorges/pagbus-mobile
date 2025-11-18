@@ -5,6 +5,7 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { buslineService, BusLine } from '../../services/buslineService';
 import { authService } from '../../services/authService';
+import { formatBusLineName } from '../../utils/busLine';
 
 export default function SelectBusLineScreen() {
   const router = useRouter();
@@ -67,7 +68,7 @@ export default function SelectBusLineScreen() {
 
   return (
     <View style={styles.container}>
-      <StatusBar style="dark" />
+      <StatusBar style="dark" hidden />
 
       {/* Header */}
       <View style={styles.header}>
@@ -135,7 +136,9 @@ export default function SelectBusLineScreen() {
                 <View style={styles.busLineHeader}>
                   <Ionicons name="bus" size={32} color="#27C992" />
                   <View style={styles.busLineInfo}>
-                    <Text style={styles.busLineName}>{line.name}</Text>
+                    <Text style={styles.busLineName}>
+                      {formatBusLineName(line.name, 'Linha')}
+                    </Text>
                     <Text style={styles.busLineCode}>{line.busline_code}</Text>
                   </View>
                   <Ionicons name="chevron-forward" size={24} color="#27C992" />
@@ -280,4 +283,3 @@ const styles = StyleSheet.create({
     color: '#fff',
   },
 });
-

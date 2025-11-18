@@ -5,6 +5,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { vehicleService, Vehicle } from '../../services/vehicleService';
 import { selectionService } from '../../services/selectionService';
+import { formatBusLineName } from '../../utils/busLine';
 
 export default function SelectVehicleScreen() {
   const router = useRouter();
@@ -75,7 +76,7 @@ export default function SelectVehicleScreen() {
 
   return (
     <View style={styles.container}>
-      <StatusBar style="dark" />
+      <StatusBar style="dark" hidden />
 
       {/* Header */}
       <View style={styles.header}>
@@ -92,7 +93,12 @@ export default function SelectVehicleScreen() {
           <Ionicons name="checkmark-circle" size={24} color="#4CAF50" />
           <View style={styles.selectedInfo}>
             <Text style={styles.selectedLabel}>Linha selecionada:</Text>
-            <Text style={styles.selectedText}>{busLineName}</Text>
+            <Text style={styles.selectedText}>
+              {formatBusLineName(
+                typeof busLineName === 'string' ? busLineName : '',
+                'Linha não informada'
+              )}
+            </Text>
           </View>
         </View>
 
@@ -321,4 +327,3 @@ const styles = StyleSheet.create({
     color: '#fff',
   },
 });
-
